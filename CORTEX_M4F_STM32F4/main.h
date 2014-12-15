@@ -36,12 +36,6 @@
 
 enum KeyName{ESC=27, BACKSPACE=127};
 
-enum {
-		GAME_START,
-		GAME_PAUSE,
-		GAME_RESUME,
-		GAME_STOP
-};
 
 
 /* Exported types ------------------------------------------------------------*/

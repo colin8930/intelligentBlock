@@ -27,7 +27,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "game.h"
 #include "shell.h"
 #include "FreeRTOS.h"
 #include "task.h"
