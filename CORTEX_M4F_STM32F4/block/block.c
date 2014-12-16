@@ -37,8 +37,11 @@ int blockTotal=0;
 
 void scanBlock(){
 
+	/* init the GPIO */
+	M74HC165_Init();
 
 	/* read shift register first*/
+	readSRs();
 	USART1_puts("\n\rscanning start\n\r");
        	while(USART_GetFlagStatus(USART6, USART_FLAG_TXE) == RESET);
 	
