@@ -17,6 +17,13 @@
 
 #define SCANTIMEOUT 100000
 #define BLOCKMAX 100
+#define M74HC165_PORT		GPIOA
+#define M74HC165_PORT_RCC	RCC_AHB1Periph_GPIOA
+#define M74HC165_ENABLE	GPIO_Pin_0
+#define M74HC165_LOAD		GPIO_Pin_1
+#define M74HC165_CLOCK		GPIO_Pin_2
+#define M74HC165_DATA		GPIO_Pin_3
+
 
 /* test */
 uint8_t block[BLOCKMAX];
@@ -30,6 +37,8 @@ int blockTotal=0;
 
 void scanBlock(){
 
+
+	/* read shift register first*/
 	USART1_puts("\n\rscanning start\n\r");
        	while(USART_GetFlagStatus(USART6, USART_FLAG_TXE) == RESET);
 	
@@ -143,6 +152,49 @@ void putTab(int n){
 	}
 
 }
+
+
+uint8_t readSR(){
+
+	uint8_t result=0;
+	for(int i = 0; i < 8; i++){
+
+		result|=GPIO_ReadInputDataBit(M74HC165_PORT, M74HC165_DATA);
+		GPIO_ResetBits(M74HC165_PORT, M74HC165_CLOCK);
+		GPIO_SetBits(M74HC165_PORT, M74HC165_CLOCK);
+
+	} 
+	return result;
+
+
+}
+
+/* read shift register */
+void readSRs(){ 
+
+	/*load the parallel data*/
+	GPIO_ResetBits(M74HC165_PORT, M74HC165_LOAD);
+	GPIO_SetBits(M74HC165_PORT, M74HC165_LOAD);
+
+	/*enable the clock */
+	GPIO_SetBits(M74HC165_PORT, M74HC165_CLOCK);
+	GPIO_ResetBits(M74HC165_PORT, M74HC165_ENABLE);
+
+	/* read a byte*/
+	uint8_t incomming = readSR();
+	while(incomming!=0){
+
+		block[blockTotal]=incomming;
+		blockTotal++;
+		incomming = readSR();
+
+	}
+	if(blockTotal!=0) blockTotal--;
+	GPIO_SetBits(M74HC165_PORT, M74HC165_ENABLE);
+
+}
+
+
 static char* itoa(int value, char* result, int base)
 {
 	if (base < 2 || base > 36) {
@@ -167,6 +219,28 @@ static char* itoa(int value, char* result, int base)
 	}
 	return result;
 }
+/**********************************74HC165*******************************/
+void M74HC165_Init(void)
+{
+	/* set up shift register pin */
+	GPIO_InitTypeDef GPIO_InitStructure;
+	RCC_AHB1PeriphClockCmd(M74HC165_PORT_RCC, ENABLE);
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Pin = (M74HC165_CLOCK|M74HC165_LOAD|M74HC165_ENABLE);
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_Init(M74HC165_PORT, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_InitStructure.GPIO_Pin = M74HC165_DATA;
+	GPIO_Init(M74HC165_PORT, &GPIO_InitStructure);
+
+	GPIO_SetBits(M74HC165_PORT,M74HC165_LOAD);
+	GPIO_SetBits(M74HC165_PORT,M74HC165_ENABLE);
+
+}
+
 
 
 /**********************************UART***********************************************/
