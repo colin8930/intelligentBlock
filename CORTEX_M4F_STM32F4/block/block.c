@@ -17,9 +17,9 @@
 
 #define SCANTIMEOUT 100000
 #define BLOCKMAX 100
-#define M74HC165_PORT		GPIOA
-#define M74HC165_PORT_RCC	RCC_AHB1Periph_GPIOA
-#define M74HC165_ENABLE	GPIO_Pin_0
+#define M74HC165_PORT		GPIOB
+#define M74HC165_PORT_RCC	RCC_AHB1Periph_GPIOB
+#define M74HC165_ENABLE		GPIO_Pin_0
 #define M74HC165_LOAD		GPIO_Pin_1
 #define M74HC165_CLOCK		GPIO_Pin_2
 #define M74HC165_DATA		GPIO_Pin_3
@@ -38,11 +38,15 @@ int blockTotal=0;
 void scanBlock(){
 
 	/* init the GPIO */
-	M74HC165_Init();
+	
 
 	/* read shift register first*/
-	readSRs();
+	blockTotal=0;
 	USART1_puts("\n\rscanning start\n\r");
+	M74HC165_Init();
+	readSRs();
+
+	#if 0
        	while(USART_GetFlagStatus(USART6, USART_FLAG_TXE) == RESET);
 	
 	USART_SendData(USART6, 0x31);
@@ -53,7 +57,7 @@ void scanBlock(){
         		uint8_t a = USART_ReceiveData(USART6);
 
 
-        	int i = 0; 
+        	int i = blockTotal;
        	/*scan until t == 0x00 */
         	while(1){
         		
@@ -66,8 +70,9 @@ void scanBlock(){
         		i++;
 
         	}
+        	#endif
         	USART1_puts("scan finished");
-        	blockTotal=i;
+        	//blockTotal=i;
 
 }
 
@@ -160,11 +165,15 @@ void putTab(int n){
 uint8_t readSR(){
 
 	uint8_t result=0;
-	for(int i = 0; i < 8; i++){
+	for(int i = 7; i >=0; i--){
 
-		result|=GPIO_ReadInputDataBit(M74HC165_PORT, M74HC165_DATA);
-		GPIO_ResetBits(M74HC165_PORT, M74HC165_CLOCK);
+		
+		//result|=(<<i);
+		if(M74HC165_PORT->IDR&M74HC165_DATA) result|= (1<<i);
+		
+		GPIO_ResetBits(M74HC165_PORT, M74HC165_CLOCK);		
 		GPIO_SetBits(M74HC165_PORT, M74HC165_CLOCK);
+		
 
 	} 
 	return result;
@@ -177,14 +186,16 @@ void readSRs(){
 
 	/*load the parallel data*/
 	GPIO_ResetBits(M74HC165_PORT, M74HC165_LOAD);
+	
 	GPIO_SetBits(M74HC165_PORT, M74HC165_LOAD);
-
+	
 	/*enable the clock */
-	GPIO_SetBits(M74HC165_PORT, M74HC165_CLOCK);
+	GPIO_SetBits(M74HC165_PORT, M74HC165_CLOCK);	
 	GPIO_ResetBits(M74HC165_PORT, M74HC165_ENABLE);
-
+	
 	/* read a byte*/
-	uint8_t incomming = readSR();
+	while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+		USART_SendData(USART1, incomming+48);
 	while(incomming!=0){
 
 		block[blockTotal]=incomming;
@@ -192,7 +203,7 @@ void readSRs(){
 		incomming = readSR();
 
 	}
-	if(blockTotal!=0) blockTotal--;
+	
 	GPIO_SetBits(M74HC165_PORT, M74HC165_ENABLE);
 
 }
@@ -256,12 +267,12 @@ void RCC_Configuration(void)
        RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
 
 /* USART1 clock enable */
-      RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART6, ENABLE);
+      //RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART6, ENABLE);
 
        
       RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
-      RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+     //RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
       /* GPIOA clock enable */
 
 }
@@ -281,15 +292,15 @@ void GPIO_Configuration(void)
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
 	/*-------------------------- GPIO Configuration(UART 6) ----------------------------*/
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
-	GPIO_Init(GPIOC, &GPIO_InitStructure);
+	//GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
+	//GPIO_Init(GPIOC, &GPIO_InitStructure);
 
 	/* Connect USART pins to AF */
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_USART1);   // USART1_TX
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);  // USART1_RX
 
-	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_USART6);   // USART2_TX
-	GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_USART6);  // USART2_RX
+	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_USART6);   // USART2_TX
+	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_USART6);  // USART2_RX
 }
  
 /**************************************************************************************/
@@ -314,8 +325,8 @@ void USART_Configuration(void)
 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 
-	USART_Init(USART6, &USART_InitStructure); //USART2 init
-	USART_Cmd(USART6, ENABLE);
+	//USART_Init(USART6, &USART_InitStructure); //USART2 init
+	//USART_Cmd(USART6, ENABLE);
 
 	USART_Init(USART1, &USART_InitStructure);  //USART1 init
 	USART_Cmd(USART1, ENABLE);
