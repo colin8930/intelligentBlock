@@ -1,4 +1,3 @@
-#include "game.h"
 #include "main.h"
 #include "stm32f4xx.h"
 #include "shell.h"
@@ -13,6 +12,8 @@
 #include <string.h>
 #include "queue.h"
 #include "semphr.h"
+#include "global.h"
+
 
 
 #define SCANTIMEOUT 100000
@@ -25,16 +26,221 @@
 #define M74HC165_DATA		GPIO_Pin_3
 
 
-/* test */
-uint8_t block[BLOCKMAX];
+
+uint8_t block[BLOCKMAX]={0x80, 0x0A, IF, LESS, X, 0x05,  PRINT, 0x31, 0x01, ADD, X, 0x01, 0x01,PRINT, 'i','f', ' ' , 'i', 's',' ', 'f', 'i', 'n', 'i', 's', 'h', 'e','d',0x01, 0x00};
+
+int state = 0;  //not used now
+
+/*
+	0: blockly
+
+*/
 
 
-int blockTotal=0;
+/*test*/
+/*
+	print("test");
+	repeat(10){
+		print(Hello World!);
+	}
 
-/* test */
+
+*/
 
 
+int blockTotal=37;
+int x=0;
+int y=0;
+int z=0;
+int ifCount=0;
 
+int varAssign(uint8_t in){    //for condition
+	switch(in){
+		
+
+		case X: ;
+			return x;
+			break;
+		case Y: ;
+			return y;
+			break;
+		case Z: ;
+			return z;
+			break;
+		default :
+			return 0;  // should not be here
+			break;		
+	}
+	return 0;
+}
+
+int cal(uint8_t con, uint8_t* nextR){
+
+	switch(con){
+		
+		case ADD:
+			
+			if((block[*nextR+2]&0x40)==0x40){
+
+				switch(block[*nextR+1]){
+
+				case X:					
+					x+=varAssign(block[*nextR+2]);
+					
+					break;
+				case Y:
+					y+=varAssign(block[*nextR+2]);
+					break;
+				case Z:
+					z+=varAssign(block[*nextR+2]);
+					break;	
+				default:
+					break;
+
+				}
+			}
+			else{
+
+				switch(block[*nextR+1]){
+
+				case X:					
+					x+=block[*nextR+2];					
+					//return *nextR+3;
+					break;
+				case Y:
+					y+=block[*nextR+2];
+					//return *nextR+3;
+					break;
+				case Z:
+					//return *nextR+3;
+					z+=block[*nextR+2];
+					break;	
+				default:
+					break;
+				}
+			}
+			break;
+
+		case MINUS:
+			if((block[*nextR+2]&0x40)==0x40){
+
+				switch(block[*nextR+1]){
+
+				case X:
+					x-=varAssign(block[*nextR+2]);
+					break;
+				case Y:
+					y-=varAssign(block[*nextR+2]);
+					break;
+				case Z:
+					z-=varAssign(block[*nextR+2]);
+					break;	
+				default:
+					break;
+
+				}
+			}
+			else{
+
+				switch(block[*nextR+1]){
+
+				case X:
+					x-=block[*nextR+2];
+					break;
+				case Y:
+					y-=block[*nextR+2];
+					break;
+				case Z:
+					z-=block[*nextR+2];
+					break;	
+				default:
+					break;
+				}
+			break;
+		}
+			
+	}
+
+
+}
+
+int det_condition(uint8_t con, uint8_t* nextR){
+	int A, B=0;
+	switch(con){
+
+		case IFAHEAD: ;
+
+			/*  call ifAhead(), it should return 1 when there is path ahead.*/
+			// return ifAhead();
+			return 1;
+			break;
+		case IFRIGHT: ;
+
+			/* call ifRight(), it should return 1 when there is path right.*/
+			// return ifRight();
+			return 1;
+			break;
+		case IFLEFT: ;
+			/* call ifLeft()), it should return 1 when there is path left.*/
+			// return ifLeft();
+			return 1;
+			break;
+
+		case GREATER: ;
+			
+			A=varAssign(block[*nextR+2]);
+			if((block[*nextR+3]&0x40)==0x40){
+				B=varAssign(block[*nextR+3]);
+			}
+			else B=block[*nextR+3];
+			if(A>B) {
+				*nextR=*nextR+4;
+				return 1;
+			}
+			else{
+				return 0;				
+			}
+
+
+		case LESS: ;
+
+			
+			A=varAssign(block[(*nextR)+2]);
+
+			if((block[*nextR+3]&0x40)==0x40){
+				B=varAssign(block[*nextR+3]);
+			}
+			else B=block[*nextR+3];
+			
+			
+			if(A<B) {
+				*nextR=*nextR+4;
+				return 1;
+			}
+			else{
+				return 0;				
+			}
+
+		case EQUAL: ;
+
+			A=varAssign(block[*nextR+2]);
+			
+			if(block[*nextR+3]&0x40==0x40){
+				B=varAssign(block[*nextR+3]);
+			}
+			else B=block[*nextR+3];
+
+			if(A==B) {
+				*nextR=*nextR+4;	
+				return 1;
+			}
+			else{
+				return 0;				
+			}
+
+	}
+
+}
 void scanBlock(){
 
 	/* init the GPIO */
@@ -71,7 +277,7 @@ void scanBlock(){
 
         	}
         	#endif
-        	USART1_puts("scan finished");
+        	USART1_puts("scan finished\n\r");
         	//blockTotal=i;
 
 }
@@ -87,16 +293,16 @@ void showCode(){
 		
 
 		//control
-		if((block[i]&0x80)==0x80){  
+		if((block[i]&OPCODE)==OPCODE){  
 
 			if(tabNum > 0) putTab(tabNum);
-			tabNum++;
+			
 			
 			switch (block[i]) {
 
-				case 0x80:  //while
-
-					USART1_puts("while(");
+				case REPEAT:  //while
+					tabNum++;
+					USART1_puts("repeat(");
 					i++;
 					while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
 					USART_SendData(USART1, block[i]+48);
@@ -104,8 +310,8 @@ void showCode(){
 					
 					break;
 
-				case 0x81: //if
-
+				case IF: //if
+					tabNum++;
 					USART1_puts("if(");
 					i++;
 					while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
@@ -114,11 +320,22 @@ void showCode(){
 					
 					break;
 
-				case 0x82: //else
-
+				case ELSE: //else
+					tabNum++;
 					USART1_puts("else{\r\n");
 					break;
+				case PRINT:
+					USART1_puts("print(\"");
+						i++;
+					while(block[i]!=0x01){
+						USART1_put(block[i]);
+						i++;
+					}
+					
+					USART1_puts("\");\r\n");
 
+
+					break;
 				default :
 
 					USART1_puts("block config error!\r\n");
@@ -149,6 +366,98 @@ void showCode(){
 
 
 }
+
+void run(){
+
+	USART1_puts("\r\n");
+	int run = 0;
+	while( (run=runCode(run))!=0);
+	USART1_puts("running finished");
+
+}
+
+int runCode(int run){
+
+	while(block[run]!=0){
+
+		if((block[run]&OPCODE)==OPCODE){   //special block
+			int next = run;
+			switch(block[run]){
+
+				case REPEAT: ;
+					uint8_t repeatTime = block[run+1];
+					
+					for(int i = 0; i < repeatTime; i++){
+
+						next=runCode(run+2);
+						//x++;
+					}
+
+					return next;
+					break;
+					
+				case IF: ;
+					uint8_t condition = block[run+1];
+					
+					if(det_condition(condition, &next)){
+
+						ifCount++;
+						next=runCode(next);
+						return next;
+
+					} 
+					else{
+
+						while(block[next]!=0x01) next++;
+					}
+					return next+1;
+					break;
+
+
+				/*
+				case ELSA: ;
+
+
+				break;
+
+				*/
+				case PRINT: ;
+					int running = run+1;
+					while(block[running]!=BRACKET){
+
+						USART1_put(block[running]);
+						running++;
+					}
+
+					return runCode(running+1);  //next of 0x01
+					break;
+				case ADD: ;
+					next=cal(ADD, &next);
+					return runCode(next);
+					break;
+				case MINUS: ;
+					next=cal(MINUS, &next);
+					return runCode(next);
+					break;
+				default:
+					break;
+
+			}
+
+		}
+
+
+		if(block[run]==0x01&&ifCount>0){
+			ifCount--;
+			return run+1;
+		} 
+
+
+	} 
+	return 0;
+}
+
+
 
 
 void putTab(int n){
@@ -194,8 +503,8 @@ void readSRs(){
 	GPIO_ResetBits(M74HC165_PORT, M74HC165_ENABLE);
 	
 	/* read a byte*/
-	while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
-		USART_SendData(USART1, incomming+48);
+	uint8_t incomming=readSR();
+	
 	while(incomming!=0){
 
 		block[blockTotal]=incomming;
@@ -342,6 +651,14 @@ void USART1_puts(char* s)
 	USART_SendData(USART1, *s);
         s++;
     }
+}
+
+void USART1_put(uint8_t s)
+{
+
+        while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+	USART_SendData(USART1, s);
+
 }
 
 /**************************************************************************************/
