@@ -27,7 +27,7 @@
 
 
 
-uint8_t block[BLOCKMAX]={0x80, 0x0A, IF, LESS, X, 0x05,  PRINT, 0x31, 0x01, ADD, X, 0x01, 0x01,PRINT, 'i','f', ' ' , 'i', 's',' ', 'f', 'i', 'n', 'i', 's', 'h', 'e','d',0x01, 0x00};
+uint8_t block[BLOCKMAX]={REPEAT, 10, IF, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, BRACKET, ADD, X, 1, BRACKET,  END};
 
 int state = 0;  //not used now
 
@@ -48,7 +48,7 @@ int state = 0;  //not used now
 */
 
 
-int blockTotal=37;
+int blockTotal=14;
 int x=0;
 int y=0;
 int z=0;
@@ -87,6 +87,8 @@ int cal(uint8_t con, uint8_t* nextR){
 				case X:					
 					x+=varAssign(block[*nextR+2]);
 					
+					
+						
 					break;
 				case Y:
 					y+=varAssign(block[*nextR+2]);
@@ -100,20 +102,21 @@ int cal(uint8_t con, uint8_t* nextR){
 				}
 			}
 			else{
-
 				switch(block[*nextR+1]){
 
 				case X:					
-					x+=block[*nextR+2];					
-					//return *nextR+3;
+					x+=block[*nextR+2];
+					//USART1_put(x+30);	
+					return *nextR+3;
 					break;
 				case Y:
 					y+=block[*nextR+2];
-					//return *nextR+3;
+					return *nextR+3;
 					break;
 				case Z:
-					//return *nextR+3;
+					
 					z+=block[*nextR+2];
+					return *nextR+3;
 					break;	
 				default:
 					break;
@@ -251,7 +254,7 @@ void scanBlock(){
 	USART1_puts("\n\rscanning start\n\r");
 	M74HC165_Init();
 	readSRs();
-
+	USART1_put(block[0]+48);
 	#if 0
        	while(USART_GetFlagStatus(USART6, USART_FLAG_TXE) == RESET);
 	
@@ -423,11 +426,19 @@ int runCode(int run){
 				*/
 				case PRINT: ;
 					int running = run+1;
-					while(block[running]!=BRACKET){
+					if(block[running]==HELLOWORLD){
+
+						USART1_puts("Hello world!\r\n");
+						running++;
+					}
+					else{
+						while(block[running]!=BRACKET){
 
 						USART1_put(block[running]);
 						running++;
+						}
 					}
+					
 
 					return runCode(running+1);  //next of 0x01
 					break;
@@ -447,10 +458,13 @@ int runCode(int run){
 		}
 
 
-		if(block[run]==0x01&&ifCount>0){
+		else if(block[run]==0x01&&ifCount>0){
 			ifCount--;
-			return run+1;
+			return runCode(run+1);
 		} 
+		else{
+			return 0;
+		}
 
 
 	} 
@@ -504,7 +518,7 @@ void readSRs(){
 	
 	/* read a byte*/
 	uint8_t incomming=readSR();
-	
+	USART1_put(incomming+48);
 	while(incomming!=0){
 
 		block[blockTotal]=incomming;
