@@ -26,8 +26,8 @@
 #define M74HC165_DATA		GPIO_Pin_3
 
 
-
-uint8_t block[BLOCKMAX]={REPEAT, 10, IF, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, BRACKET, ADD, X, 1, BRACKET,  END};
+//uint8_t block[BLOCKMAX];
+uint8_t block[BLOCKMAX]={REPEAT, 10, IF, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, BRACKET, ELSE , PRINT, TEST,BRACKET, BRACKET, ADD, X, 1, BRACKET,  END};
 
 int state = 0;  //not used now
 
@@ -53,7 +53,31 @@ int x=0;
 int y=0;
 int z=0;
 int ifCount=0;
+int elseCount=0;
+static char* itoa(int value, char* result, int base)
+{
+	if (base < 2 || base > 36) {
+		*result = '\0';
+		return result;
+	}
+	char *ptr = result, *ptr1 = result, tmp_char;
+	int tmp_value;
 
+	do {
+		tmp_value = value;
+		value /= base;
+		*ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
+	} while (value);
+
+	if (tmp_value < 0) *ptr++ = '-';
+	*ptr-- = '\0';
+	while (ptr1 < ptr) {
+		tmp_char = *ptr;
+		*ptr-- = *ptr1;
+		*ptr1++ = tmp_char;
+	}
+	return result;
+}
 int varAssign(uint8_t in){    //for condition
 	switch(in){
 		
@@ -307,8 +331,11 @@ void showCode(){
 					tabNum++;
 					USART1_puts("repeat(");
 					i++;
-					while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
-					USART_SendData(USART1, block[i]+48);
+					char* string=" ";
+					string=itoa(block[i], string ,10);
+					USART1_puts("10");
+					//while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+					//USART_SendData(USART1, block[i]+48);
 					USART1_puts("){ \r\n");
 					
 					break;
@@ -317,8 +344,13 @@ void showCode(){
 					tabNum++;
 					USART1_puts("if(");
 					i++;
-					while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
-					USART_SendData(USART1, block[i]+48);
+					USART1_puts("X");
+					i++;
+					USART1_puts("<");
+					i++;
+					USART1_puts("5");
+					
+					
 					USART1_puts("){ \r\n");
 					
 					break;
@@ -327,18 +359,43 @@ void showCode(){
 					tabNum++;
 					USART1_puts("else{\r\n");
 					break;
-				case PRINT:
+				case PRINT: ;
 					USART1_puts("print(\"");
 						i++;
-					while(block[i]!=0x01){
-						USART1_put(block[i]);
+					if(block[i]==HELLOWORLD){
+
+						USART1_puts("Hello world!");
 						i++;
 					}
+					else if(block[i]==TEST){
+
+						USART1_puts("TEST");
+						i++;
+					}
+					else{
+						while(block[i]!=0x01){
+							USART1_put(block[i]);
+							i++;
+						}
+
+					}					
 					
 					USART1_puts("\");\r\n");
 
 
 					break;
+				case ADD: ;
+
+					USART1_puts("add(");
+					i++;
+					USART1_puts("X, ");
+					i++;
+					USART1_put(block[i]+0x30);
+					i++;
+					USART1_puts(");\r\n");
+					break;
+
+
 				default :
 
 					USART1_puts("block config error!\r\n");
@@ -393,7 +450,6 @@ int runCode(int run){
 					for(int i = 0; i < repeatTime; i++){
 
 						next=runCode(run+2);
-						//x++;
 					}
 
 					return next;
@@ -406,19 +462,28 @@ int runCode(int run){
 
 						ifCount++;
 						next=runCode(next);
-						return next;
+						if(block[next]==ELSE){
 
+							return runCode(norunCode(next+1) );					
+						}
+						return runCode(next);
 					} 
 					else{
-
-						while(block[next]!=0x01) next++;
+						
+						
+						next=norunCode(run+1);
+						if(block[next]==ELSE){
+							elseCount++;
+							return runCode(next+1);
+						}
+						else return runCode(next);
 					}
-					return next+1;
+
 					break;
 
 
 				/*
-				case ELSA: ;
+				case ELSE: ;
 
 
 				break;
@@ -431,9 +496,14 @@ int runCode(int run){
 						USART1_puts("Hello world!\r\n");
 						running++;
 					}
+					else if(block[running]==TEST){
+
+						USART1_puts("TEST\r\n");
+						running++;
+					}
+
 					else{
 						while(block[running]!=BRACKET){
-
 						USART1_put(block[running]);
 						running++;
 						}
@@ -460,7 +530,11 @@ int runCode(int run){
 
 		else if(block[run]==0x01&&ifCount>0){
 			ifCount--;
-			return runCode(run+1);
+			return run+1;
+		} 
+		else if(block[run]==0x01&&elseCount>0){
+			elseCount--;
+			return run+1;
 		} 
 		else{
 			return 0;
@@ -471,6 +545,55 @@ int runCode(int run){
 	return 0;
 }
 
+int norunCode(int run){  //for if else
+
+	int  count=1; 
+	int running = run;
+	while(count>0){
+
+		if((block[running]&OPCODE)==OPCODE){   //special block
+			
+			switch(block[running]){
+
+				case REPEAT: ;
+					count++;
+				break;
+					
+				case IF: ;
+					count++;
+				break;
+				
+				case ELSE: ;
+					count++;
+					break;
+				
+				case PRINT: ;
+					count++;
+					break;
+
+				case ADD: ;					
+					break;
+
+				case MINUS: ;					
+					break;
+
+				default:
+					break;
+
+			}
+
+		}
+
+
+		else if(block[running]==BRACKET){
+			count--;
+			
+		} 
+		running++;
+
+	} 
+	return running;
+}
 
 
 
@@ -532,30 +655,7 @@ void readSRs(){
 }
 
 
-static char* itoa(int value, char* result, int base)
-{
-	if (base < 2 || base > 36) {
-		*result = '\0';
-		return result;
-	}
-	char *ptr = result, *ptr1 = result, tmp_char;
-	int tmp_value;
 
-	do {
-		tmp_value = value;
-		value /= base;
-		*ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
-	} while (value);
-
-	if (tmp_value < 0) *ptr++ = '-';
-	*ptr-- = '\0';
-	while (ptr1 < ptr) {
-		tmp_char = *ptr;
-		*ptr-- = *ptr1;
-		*ptr1++ = tmp_char;
-	}
-	return result;
-}
 /**********************************74HC165*******************************/
 void M74HC165_Init(void)
 {
