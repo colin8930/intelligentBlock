@@ -1,8 +1,11 @@
 #include "stm32f429i_discovery.h"
 #include "stm32f429i_discovery_lcd.h"
 #include "stm32f429i_discovery_l3gd20.h"
+#include "stdio.h"
+#include "stdlib.h"
 
 void Wifi_config(){
+	
 
 
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART6, ENABLE);
@@ -14,7 +17,7 @@ void Wifi_config(){
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA, &GPIO_InitStructure);
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
 	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_USART6);   // USART6_TX
 	GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_USART6);  // USART6_RX
@@ -56,25 +59,46 @@ static char* itoa(int value, char* result, int base)
 	}
 	return result;
 }
-int toCmdmode(){
 
-	
-	USART6_puts("+++");   //put +++
+int toCmdmode(){
+	for(int i=0;i<1000;i++){}
+	//USART6_puts("+++");
+	USART6_puts("+");
+	//for(int i=0;i<100;i++){}
+	USART6_puts("+");   //put +++
+	//for(int i=0;i<100;i++){}	
+	USART6_puts("+");
+
+//	USART6_puts("+");
+
 	while(USART_GetFlagStatus(USART6, USART_FLAG_RXNE) == RESET);
-	USART_SendData(USART1,USART_ReceiveData(USART6));
+	//char* str = itoa(USART_ReceiveData(USART6),str,10);
+	uint16_t a = USART_ReceiveData(USART6);
+	
+	for(int i = 8 ; i>=0; i--){
+		if(a&(1<<i))
+			USART1_puts("1");
+		else USART1_puts("0");
+	}
+
+
+	if(a ==0x0061){
 		USART6_puts("a");
-	//}
-	//else return 0;
-	//if(UART_cmp("+ok")) 
+		//USART1_puts("inside");
+	}
+	else return 0;
+	if(UART_cmp("+ok")){
+		//USART1_puts("222"); 
 		return 1;
-	//else return 0;
+	}
+	else return 0;
 
 
 }
 
 int closeE(){
 
-	USART6_puts("AT+E=on\r");   
+	USART6_puts("AT+E=off\r");   
 	if(UART_cmp("+ok\r\n\r\n")) return 1;
 	else return 0;
 
@@ -100,19 +124,23 @@ int sendDataLeng(int size){
 void WifiTest(){
 
 	Wifi_config();
-	USART1_puts("config ok");
-	if(!toCmdmode()) USART1_puts("error occurs when switch to command mode");
-	else{
-		USART1_puts("command mode ok");
-		if(!closeE()) USART1_puts("error occurs when closing E");
-		USART1_puts("closeE");
-		while(!checkTCP()); // repeat until TCP connect
-		USART1_puts("TCP connect OK!");
-	}
+	USART1_puts("config ok\r\n");
+	if(!toCmdmode()) USART1_puts("error occurs when switch to command mode\r\n");
 	
+	else{
+		USART1_puts("command mode ok\r\n");
+		if(!closeE()) USART1_puts("error occurs when closing E\r\n");
+		else USART1_puts("closeE\r\n");
 
+		while(!checkTCP()); // repeat until TCP connect
+		USART1_puts("TCP connect OK!\r\n");
+	}
 
-
+	
+	while(1)
+		USART6_puts("AT+L\r");
+	
+	
 }
 void USART6_puts(char* s)
 {
@@ -126,7 +154,8 @@ void USART6_puts(char* s)
 int UART_cmp(char* str){
 	while(*str){
 		while(USART_GetFlagStatus(USART6, USART_FLAG_RXNE) == RESET);
-		USART1_puts("test");
+		//USART1_puts("dbg-cmp\r\n");
+		//USART_SendData(USART1, USART_ReceiveData(USART6));
 		if(USART_ReceiveData(USART6)!=*str)	return 0;
 		else{
 			str++;
