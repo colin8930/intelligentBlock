@@ -8,7 +8,7 @@
 #include "semphr.h"
 #include "main.h"
 #include "game.h"
-
+#include "Wifi_HF_LPB100.h"
 
 typedef struct {
 	const char *name;
@@ -20,6 +20,8 @@ extern volatile xQueueHandle t_queue;
 
 void scan_command(int, char **);
 void show_command(int, char **);
+void wifitest_command(int, char **);
+void run_command(int, char **);
 
 
 
@@ -28,7 +30,9 @@ void show_command(int, char **);
 cmdlist cl[]={
 
 	MKCL(scan, "scan"),
-	MKCL(show, "show")
+	MKCL(show, "show"),
+	MKCL(wifitest, "wifitest"),
+	MKCL(run, "run")
 
 };
 
@@ -65,6 +69,18 @@ void scan_command(int n, char *argv[]){
 void show_command(int n, char *argv[]){
 
 	showCode();
+
+}
+
+void wifitest_command(int n, char *argv[]){
+
+	WifiTest();
+
+}
+
+void run_command(int n, char *argv[]){
+
+	run();
 
 }
 

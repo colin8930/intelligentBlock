@@ -36,6 +36,7 @@
 #include <string.h>
 #include "queue.h"
 #include "semphr.h"
+#include "Wifi_HF_LPB100.h"
 /** @addtogroup Template
   * @{
   */ 
