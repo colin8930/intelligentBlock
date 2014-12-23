@@ -454,11 +454,26 @@ int runCode(int run){
 
 					return next;
 					break;
+
+				case REPEATUNTIL: ;    //while
+
+					uint8_t whileCond = block[run+1];
+					int torun=next;
 					
+					while(det_condition(whileCond, &next)){
+
+						// if it return TRUE, run code until  the bracket of while, while() {    " } " .
+						ifCount++;
+						runCode(next);
+						next=torun;
+					}
+					elseCount++;
+					return runCode(norunCode(next+1) );
+					break;
 				case IF: ;
-					uint8_t condition = block[run+1];
+					uint8_t ifCond = block[run+1];
 					
-					if(det_condition(condition, &next)){
+					if(det_condition(ifCond, &next)){
 
 						ifCount++;
 						next=runCode(next);
