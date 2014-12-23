@@ -22,6 +22,7 @@ void scan_command(int, char **);
 void show_command(int, char **);
 void wifitest_command(int, char **);
 void run_command(int, char **);
+void sendcode_command(int, char **);   //send code to uart
 
 
 
@@ -32,7 +33,8 @@ cmdlist cl[]={
 	MKCL(scan, "scan"),
 	MKCL(show, "show"),
 	MKCL(wifitest, "wifitest"),
-	MKCL(run, "run")
+	MKCL(run, "run"),
+	MKCL(sendcode, "sendcode")
 
 };
 
@@ -81,6 +83,12 @@ void wifitest_command(int n, char *argv[]){
 void run_command(int n, char *argv[]){
 
 	run();
+
+}
+
+void sendcode_command(int n, char *argv[]){
+
+	sendcode();
 
 }
 

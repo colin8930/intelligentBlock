@@ -610,7 +610,13 @@ int norunCode(int run){  //for if else
 	return running;
 }
 
+void sendcode(){
 
+	for(int i=0; i<blockTotal; i++ ){
+		USART3_put(block[i]);
+	}
+
+}
 
 void putTab(int n){
 
@@ -703,12 +709,14 @@ void RCC_Configuration(void)
       
 
        RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
+       RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
 
 /* USART1 clock enable */
       //RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART6, ENABLE);
 
        
       RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+      RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
 
      //RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
       /* GPIOA clock enable */
@@ -729,6 +737,13 @@ void GPIO_Configuration(void)
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 
+
+	/*-------------------------- GPIO Configuration(UART 3) ----------------------------*/
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+
+
 	/*-------------------------- GPIO Configuration(UART 6) ----------------------------*/
 	//GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
 	//GPIO_Init(GPIOC, &GPIO_InitStructure);
@@ -736,6 +751,9 @@ void GPIO_Configuration(void)
 	/* Connect USART pins to AF */
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_USART1);   // USART1_TX
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);  // USART1_RX
+
+	GPIO_PinAFConfig(GPIOD, GPIO_PinSource8, GPIO_AF_USART1);   // USART3_TX
+	GPIO_PinAFConfig(GPIOD, GPIO_PinSource9, GPIO_AF_USART1);  // USART3_RX
 
 	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_USART6);   // USART2_TX
 	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_USART6);  // USART2_RX
@@ -769,6 +787,9 @@ void USART_Configuration(void)
 	USART_Init(USART1, &USART_InitStructure);  //USART1 init
 	USART_Cmd(USART1, ENABLE);
 
+	USART_Init(USART3, &USART_InitStructure);  //USART1 init
+	USART_Cmd(USART3, ENABLE);
+
 	
 
 }
@@ -783,6 +804,14 @@ void USART1_puts(char* s)
 }
 
 void USART1_put(uint8_t s)
+{
+
+        while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+	USART_SendData(USART1, s);
+
+}
+
+void USART3_put(uint8_t s)
 {
 
         while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
