@@ -92,6 +92,8 @@ OBJS += \
     $(PWD)/CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src/stm32f4xx_ltdc.o \
     $(PWD)/CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src/stm32f4xx_fmc.o \
     $(PWD)/CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src/stm32f4xx_tim.o \
+    $(PWD)/CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src/stm32f4xx_rtc.o \
+    $(PWD)/CORTEX_M4F_STM32F4/Libraries/STM32F4xx_StdPeriph_Driver/src/stm32f4xx_pwr.o \
     $(PWD)/Utilities/STM32F429I-Discovery/stm32f429i_discovery.o \
     $(PWD)/Utilities/STM32F429I-Discovery/stm32f429i_discovery_sdram.o \
     $(PWD)/Utilities/STM32F429I-Discovery/stm32f429i_discovery_lcd.o \
@@ -105,6 +107,7 @@ OBJS += \
 
 #Block
 OBJS += $(PWD)/CORTEX_M4F_STM32F4/block/block.o
+OBJS += $(PWD)/CORTEX_M4F_STM32F4/block/RTC.o
 OBJS += $(PWD)/CORTEX_M4F_STM32F4/block/Wifi_HF_LPB100.o
 CFLAGS += -I $(PWD)/CORTEX_M4F_STM32F4/block/include
 

@@ -27,8 +27,9 @@
 
 
 //uint8_t block[BLOCKMAX];
-uint8_t block[BLOCKMAX]={REPEAT, 10, IF, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, BRACKET, ELSE , PRINT, TEST,BRACKET, BRACKET, ADD, X, 1, BRACKET,  END};
-
+//uint8_t block[BLOCKMAX]={REPEAT, 10, IF, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, BRACKET, ELSE , PRINT, TEST,BRACKET, BRACKET, ADD, X, 1, BRACKET,  END};
+//uint8_t block[BLOCKMAX]={REPEATUNTIL, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, ADD, X, 1, BRACKET, PRINT, TEST,BRACKET,  END};
+uint8_t block[BLOCKMAX]={WAIT, 0x00, 0x10, PRINT, HELLOWORLD, END};
 int state = 0;  //not used now
 
 /*
@@ -535,6 +536,16 @@ int runCode(int run){
 					next=cal(MINUS, &next);
 					return runCode(next);
 					break;
+
+				case WAIT: ;
+					uint8_t min = block[run+1];
+					uint8_t sec = block[run+2];
+					reset_alarm();
+					set_alarm_time(min, sec, 'a');
+					while(RTC_GetFlagStatus(RTC_FLAG_ALRAF)==RESET); // wait until time out
+					return runCode(next+3);
+
+
 				default:
 					break;
 

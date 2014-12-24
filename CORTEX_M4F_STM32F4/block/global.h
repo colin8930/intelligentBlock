@@ -16,12 +16,13 @@
 #define EQUAL 0x89
 #define ADD 0x8A
 #define MINUS 0x8B
+#define TIMER 0x8C
+#define COUNTER 0x8D
+#define WAIT 0x8E
 
-
-
-#define X 0x40
-#define Y 0x41
-#define Z 0x42
+#define X 0xF0
+#define Y 0xF1
+#define Z 0xF2
 
 #define END 0x00
 #define BRACKET 0x01
