@@ -2,16 +2,8 @@
 #include "stm32f4xx.h"
 #include "shell.h"
 #include "stm32f429i_discovery.h"
-#include "stm32f429i_discovery_lcd.h"
-#include "stm32f429i_discovery_l3gd20.h"
 #include "FreeRTOS.h"
 #include "task.h"
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "queue.h"
-#include "semphr.h"
 #include "global.h"
 
 
@@ -28,8 +20,9 @@
 
 //uint8_t block[BLOCKMAX];
 //uint8_t block[BLOCKMAX]={REPEAT, 10, IF, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, BRACKET, ELSE , PRINT, TEST,BRACKET, BRACKET, ADD, X, 1, BRACKET,  END};
-//uint8_t block[BLOCKMAX]={REPEATUNTIL, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, ADD, X, 1, BRACKET, PRINT, TEST,BRACKET,  END};
-uint8_t block[BLOCKMAX]={WAIT, 0x00, 0x10, PRINT, HELLOWORLD, END};
+uint8_t block[BLOCKMAX]={ ALARMON, PRINT,HELLOWORLD,BRACKET, REPEAT, 10, 
+	IF, IFAHEAD, MOVEFORWARD, BRACKET, IF, IFLEFT, TURNLEFT,BRACKET, IF,IFRIGHT, TURNRIGHT,BRACKET, BRACKET,ALARMOFF, END};
+//uint8_t block[BLOCKMAX]={WAIT, 0x00, 0x10, PRINT, HELLOWORLD, END};
 int state = 0;  //not used now
 
 /*
@@ -48,11 +41,11 @@ int state = 0;  //not used now
 
 */
 
-
+char Str[10];
 int blockTotal=14;
-int x=0;
-int y=0;
-int z=0;
+int a=0;
+int b=0;
+int c=0;
 int ifCount=0;
 int elseCount=0;
 static char* itoa(int value, char* result, int base)
@@ -83,14 +76,14 @@ int varAssign(uint8_t in){    //for condition
 	switch(in){
 		
 
-		case X: ;
-			return x;
+		case VARA: ;
+			return a;
 			break;
-		case Y: ;
-			return y;
+		case VARB: ;
+			return b;
 			break;
-		case Z: ;
-			return z;
+		case VARC: ;
+			return c;
 			break;
 		default :
 			return 0;  // should not be here
@@ -109,17 +102,14 @@ int cal(uint8_t con, uint8_t* nextR){
 
 				switch(block[*nextR+1]){
 
-				case X:					
-					x+=varAssign(block[*nextR+2]);
-					
-					
-						
+				case VARA:					
+					a+=varAssign(block[*nextR+2]);
 					break;
-				case Y:
-					y+=varAssign(block[*nextR+2]);
+				case VARB:
+					b+=varAssign(block[*nextR+2]);
 					break;
-				case Z:
-					z+=varAssign(block[*nextR+2]);
+				case VARC:
+					c+=varAssign(block[*nextR+2]);
 					break;	
 				default:
 					break;
@@ -129,18 +119,16 @@ int cal(uint8_t con, uint8_t* nextR){
 			else{
 				switch(block[*nextR+1]){
 
-				case X:					
-					x+=block[*nextR+2];
-					//USART1_put(x+30);	
+				case VARA:
+					a+=block[*nextR+2];
 					return *nextR+3;
 					break;
-				case Y:
-					y+=block[*nextR+2];
+				case VARB:
+					b+=block[*nextR+2];
 					return *nextR+3;
 					break;
-				case Z:
-					
-					z+=block[*nextR+2];
+				case VARC:
+					c+=block[*nextR+2];
 					return *nextR+3;
 					break;	
 				default:
@@ -154,14 +142,14 @@ int cal(uint8_t con, uint8_t* nextR){
 
 				switch(block[*nextR+1]){
 
-				case X:
-					x-=varAssign(block[*nextR+2]);
+				case VARA:
+					a-=varAssign(block[*nextR+2]);
 					break;
-				case Y:
-					y-=varAssign(block[*nextR+2]);
+				case VARB:
+					b-=varAssign(block[*nextR+2]);
 					break;
-				case Z:
-					z-=varAssign(block[*nextR+2]);
+				case VARC:
+					c-=varAssign(block[*nextR+2]);
 					break;	
 				default:
 					break;
@@ -172,14 +160,14 @@ int cal(uint8_t con, uint8_t* nextR){
 
 				switch(block[*nextR+1]){
 
-				case X:
-					x-=block[*nextR+2];
+				case VARA:
+					a-=block[*nextR+2];
 					break;
-				case Y:
-					y-=block[*nextR+2];
+				case VARB:
+					b-=block[*nextR+2];
 					break;
-				case Z:
-					z-=block[*nextR+2];
+				case VARC:
+					c-=block[*nextR+2];
 					break;	
 				default:
 					break;
@@ -193,35 +181,45 @@ int cal(uint8_t con, uint8_t* nextR){
 }
 
 int det_condition(uint8_t con, uint8_t* nextR){
-	int A, B=0;
+	int x, y=0;
 	switch(con){
 
 		case IFAHEAD: ;
 
-			/*  call ifAhead(), it should return 1 when there is path ahead.*/
-			// return ifAhead();
-			return 1;
+			if(getSensor('B')) {
+				*nextR=*nextR+2;
+				return 1;
+			}
+			else return 0;		
 			break;
+
+		case IFLEFT: ;
+
+			if(getSensor('C')) {
+				*nextR=*nextR+2;
+				return 1;
+			}
+			else return 0;
+			break;
+			
 		case IFRIGHT: ;
 
-			/* call ifRight(), it should return 1 when there is path right.*/
-			// return ifRight();
-			return 1;
+			if(getSensor('D')) {
+				*nextR=*nextR+2;
+				return 1;
+			}
+			else return 0;		
 			break;
-		case IFLEFT: ;
-			/* call ifLeft()), it should return 1 when there is path left.*/
-			// return ifLeft();
-			return 1;
-			break;
+		
 
 		case GREATER: ;
 			
-			A=varAssign(block[*nextR+2]);
+			x=varAssign(block[*nextR+2]);
 			if((block[*nextR+3]&0x40)==0x40){
-				B=varAssign(block[*nextR+3]);
+				y=varAssign(block[*nextR+3]);
 			}
-			else B=block[*nextR+3];
-			if(A>B) {
+			else y=block[*nextR+3];
+			if(x>y) {
 				*nextR=*nextR+4;
 				return 1;
 			}
@@ -233,15 +231,15 @@ int det_condition(uint8_t con, uint8_t* nextR){
 		case LESS: ;
 
 			
-			A=varAssign(block[(*nextR)+2]);
+			x=varAssign(block[(*nextR)+2]);
 
 			if((block[*nextR+3]&0x40)==0x40){
-				B=varAssign(block[*nextR+3]);
+				y=varAssign(block[*nextR+3]);
 			}
-			else B=block[*nextR+3];
+			else y=block[*nextR+3];
 			
 			
-			if(A<B) {
+			if(x<y) {
 				*nextR=*nextR+4;
 				return 1;
 			}
@@ -251,14 +249,14 @@ int det_condition(uint8_t con, uint8_t* nextR){
 
 		case EQUAL: ;
 
-			A=varAssign(block[*nextR+2]);
+			x=varAssign(block[*nextR+2]);
 			
 			if(block[*nextR+3]&0x40==0x40){
-				B=varAssign(block[*nextR+3]);
+				y=varAssign(block[*nextR+3]);
 			}
-			else B=block[*nextR+3];
+			else y=block[*nextR+3];
 
-			if(A==B) {
+			if(x==y) {
 				*nextR=*nextR+4;	
 				return 1;
 			}
@@ -310,12 +308,79 @@ void scanBlock(){
 
 }
 
+char * _byteToStr(uint8_t oneByte)	// Hexadecimal to Decimal'string 
+{
+	
+	*Str ='0';
+	*(Str+1) = 'x';
+
+	uint8_t fw = (oneByte>>4);
+	if(fw<10) *(Str+2) = fw+'0';
+	else {
+		switch(fw){
+			case 0xA: ;
+				*(Str+2)='A';
+				break;
+			case 0xB: ;
+				*(Str+2)='B';
+				break;
+			case 0xC: ;
+				*(Str+2)='C';
+				break;
+			case 0xD: ;
+				*(Str+2)='D';
+				break;
+			case 0xE: ;
+				*(Str+2)='E';
+				break;
+			case 0xF: ;
+				*(Str+2)='F';
+				break;
+			default:
+				break;
+
+		}
+	}
+	uint8_t sw = oneByte&0x0F;
+
+	if(sw<10) *(Str+3) = sw+'0';
+	else {
+		switch(sw){
+			case 0xA: ;
+				*(Str+3)='A';
+				break;
+			case 0xB: ;
+				*(Str+3)='B';
+				break;
+			case 0xC: ;
+				*(Str+3)='C';
+				break;
+			case 0xD: ;
+				*(Str+3)='D';
+				break;
+			case 0xE: ;
+				*(Str+3)='E';
+				break;
+			case 0xF: ;
+				*(Str+3)='F';
+				break;
+			default:
+				break;
+
+		}
+	}
+	*(Str+4)='\r';
+	*(Str+5)='\n';
+	return Str;
+}
+
+
 void showCode(){
 
 	int tabNum=0;
 
 	USART1_puts("\r\n\r\n");
-
+	#if 0
 	for(int i=0; i<=blockTotal; i++){
 
 		
@@ -424,7 +489,10 @@ void showCode(){
 
 	}
 
-
+	#endif
+	int i = 0;
+	
+	while(block[i]!=0) USART1_puts(_byteToStr(block[i++]));
 
 }
 
@@ -433,7 +501,7 @@ void run(){
 	USART1_puts("\r\n");
 	int run = 0;
 	while( (run=runCode(run))!=0);
-	USART1_puts("running finished");
+	USART1_puts("running finished\r\n");
 
 }
 
@@ -562,9 +630,13 @@ int runCode(int run){
 			elseCount--;
 			return run+1;
 		} 
-		else{
-			return 0;
+		else if(block[run]!=0x00&&block[run]!=0x01){
+			int ack=sendCmd(block[run]);
+			if(!ack) USART1_puts("error occurs when the device doing the command\r\n");
+			else USART1_puts("send OK\r\n");
+			return 	runCode(run+1);
 		}
+		else return run+1;
 
 
 	} 
@@ -594,7 +666,6 @@ int norunCode(int run){  //for if else
 					break;
 				
 				case PRINT: ;
-					count++;
 					break;
 
 				case ADD: ;					
@@ -798,7 +869,8 @@ void USART_Configuration(void)
 	USART_Init(USART1, &USART_InitStructure);  //USART1 init
 	USART_Cmd(USART1, ENABLE);
 
-	USART_Init(USART3, &USART_InitStructure);  //USART1 init
+	USART_InitStructure.USART_BaudRate = 38400;
+	USART_Init(USART3, &USART_InitStructure);  //USART3 init (for bt)
 	USART_Cmd(USART3, ENABLE);
 
 	
@@ -822,13 +894,7 @@ void USART1_put(uint8_t s)
 
 }
 
-void USART3_put(uint8_t s)
-{
 
-        while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
-	USART_SendData(USART1, s);
-
-}
 
 /**************************************************************************************/
 
