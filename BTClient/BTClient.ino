@@ -14,6 +14,31 @@
 #include <LBT.h>
 #include <LBTClient.h>
 #include <LAudio.h>
+#include <Adafruit_VC0706.h>
+#include <LSD.h>
+#include <LTask.h>
+#include <LWiFi.h>
+#include <LWiFiClient.h>
+
+#define WIFI_AP "testEE"
+#define WIFI_PASSWORD "your_password"
+#define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP according to your WiFi AP configuration
+
+
+#define TEMP_BUF_SIZE (2048)
+uint8_t buf[TEMP_BUF_SIZE] = {0};
+IPAddress server(140,116,215,68);
+
+char outBuf[128];
+char outCount;
+
+LWiFiClient c;
+LWiFiClient dc;
+
+char fileName[13] = "IMAGE00.jpg\r";
+char file1[12] = "IMAGE00.jpg";
+Adafruit_VC0706 cam = Adafruit_VC0706(&Serial1);
+
 
 static LBTDeviceInfo info = {0};
 boolean find = 0;
@@ -24,7 +49,7 @@ const int motorIn1 = 4;
 const int motorIn2 = 5;
 const int motorIn3 = 6;     
 const int motorIn4 = 7;  
-
+LFile imgFile;
 
 int i=0;
 void setup()  
@@ -36,7 +61,19 @@ void setup()
   pinMode(motorIn4, OUTPUT);  
   Serial.begin(9600);
   LAudio.begin();
- 
+  Serial1.begin(38400);
+  LWiFi.begin();
+  LAudio.begin();
+  LSD.begin();
+  
+  Serial.println("Connecting to AP");
+  while (0 == LWiFi.connect(WIFI_AP,LWiFiLoginInfo(WIFI_AUTH, WIFI_PASSWORD)))
+  {
+    Serial.println("Connecting");
+    delay(1000);
+  }
+  Serial.println("Connect OK!");
+  
   ard_log("LBT start\n");
   // begin BT
   bool success = LBTClient.begin();
@@ -73,6 +110,223 @@ void setup()
   }
 }
  
+ 
+void snapshot()
+{
+  
+  // Try to locate the camera
+  if (cam.begin(38400)) {
+    Serial.println("Camera Found:");
+  } else {
+    Serial.println("No camera found?");
+   // return;
+  } 
+  cam.setImageSize(VC0706_640x480);
+  // You can read the size back from the camera (optional, but maybe useful?)
+  uint8_t imgsize = cam.getImageSize();
+
+  Serial.println("Snap in 3 secs...");
+  delay(3000);
+
+  if (! cam.takePicture()) 
+    Serial.println("Failed to snap!");
+  else 
+    Serial.println("Picture taken!");
+  
+  // Create an image with the name IMAGExx.JPG
+  char filename[13];
+  strcpy(filename, "IMAGE00.jpg");
+  if (! LSD.exists(filename)) LSD.remove(filename);
+  
+  // Open the file for writing
+  imgFile = LSD.open(filename, FILE_WRITE);
+
+  // Get the size of the image (frame) taken  
+  uint16_t jpglen = cam.frameLength();
+  Serial.print("Storing ");
+  Serial.print(jpglen, DEC);
+  Serial.print(" byte image.");
+
+  // Read all the data up to # bytes!
+  byte wCount = 0; // For counting # of writes
+  while (jpglen > 0) {
+    // read 32 bytes at a time;
+    uint8_t *buffer;
+    uint8_t bytesToRead = min(32, jpglen); // change 32 to 64 for a speedup but may not work with all setups!
+    buffer = cam.readPicture(bytesToRead);
+    imgFile.write(buffer, bytesToRead);
+    if(++wCount >= 64) { // Every 2K, give a little feedback so it doesn't appear locked up
+      Serial.print('.');
+      wCount = 0;
+    }
+    //Serial.print("Read ");  Serial.print(bytesToRead, DEC); Serial.println(" bytes");
+    jpglen -= bytesToRead;
+  }
+  imgFile.close();
+  imgFile = LSD.open(filename);
+  Serial.println("Connecting to FTP server");
+  
+  
+  while (0 == c.connect(server, 2010))
+  {
+    Serial.println("Re-Connecting to FTP");
+    delay(1000);
+  }
+  if(!eRcv()) return;
+
+  c.println("USER embbeded\r");
+  
+  if(!eRcv()) return;
+
+  c.println(F("PASS embbeded\r"));
+
+    if(!eRcv()) return;
+
+  c.println(F("SYST\r"));
+
+  if(!eRcv()) return;
+
+  c.println(F("PASV\r"));
+
+  if(!eRcv()) return;
+
+  char *tStr = strtok(outBuf,"(,");
+  int array_pasv[6];
+  for ( int i = 0; i < 6; i++) {
+    tStr = strtok(NULL,"(,");
+    array_pasv[i] = atoi(tStr);
+    if(tStr == NULL)
+    {
+      Serial.println(F("Bad PASV Answer"));    
+
+    }
+  }
+
+  unsigned int hiPort,loPort;
+
+  hiPort = array_pasv[4] << 8;
+  loPort = array_pasv[5] & 255;
+
+  Serial.print(F("Data port: "));
+  hiPort = hiPort | loPort;
+  Serial.println(hiPort);
+
+  if (dc.connect(server,hiPort)) {
+    Serial.println(F("Data connected"));
+  }
+  else {
+    Serial.println(F("Data connection failed"));
+    c.stop();
+    imgFile.close();
+    return;
+  }
+
+
+  c.print(F("STOR "));
+  c.println(fileName);
+
+  Serial.println(F("test"));
+  if(!eRcv())
+  {
+    dc.stop();
+    Serial.println(F("error"));
+    return;
+  }
+
+
+  Serial.println(F("Writing"));
+
+  byte clientBuf[64];
+  int clientCount = 0;
+  int imgSize=imgFile.size();
+
+  while(dc.connected()&&imgSize>0)
+  {
+    
+      clientBuf[clientCount] = imgFile.read();
+    clientCount++;
+    imgSize--;
+    if(clientCount > 63)
+    {
+      dc.write(clientBuf,64);
+      clientCount = 0;
+    }
+      
+  }
+if(clientCount > 0) dc.write(clientBuf,clientCount);
+
+  dc.stop();
+  Serial.println(F("Data disconnected"));
+
+  if(!eRcv()) return;
+
+  c.println(F("QUIT"));
+
+  if(!eRcv()) return;
+
+  c.stop();
+  Serial.println(F("Command disconnected"));
+
+  imgFile.close();
+  Serial.println(F("SD closed"));
+  Serial.println("done!");
+
+}
+
+byte eRcv()
+{
+  byte respCode;
+  byte thisByte;
+
+  while(!c.available()) delay(1);
+
+  respCode = c.peek();
+
+  outCount = 0;
+
+  while(c.available())
+  {  
+    thisByte = c.read();    
+    Serial.write(thisByte);
+
+    if(outCount < 127)
+    {
+      outBuf[outCount] = thisByte;
+      outCount++;      
+      outBuf[outCount] = 0;
+    }
+  }
+  
+  if(respCode >= '4')
+  {
+    efail();    
+    return 0;  
+  }
+
+  return 1;
+}
+
+void efail()
+{
+  byte thisByte = 0;
+  Serial.println("error");
+  c.println(F("QUIT"));
+
+  while(!c.available()) delay(1);
+
+  while(c.available())
+  {  
+    thisByte = c.read();    
+    Serial.write(thisByte);
+  }
+
+  c.stop();
+  Serial.println(F("Command disconnected"));
+  imgFile.close();
+  Serial.println(F("SD closed"));
+}
+
+
 void loop()
 {
     
