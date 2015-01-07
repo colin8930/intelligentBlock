@@ -16,10 +16,9 @@
 #include <LAudio.h>
 #include <Adafruit_VC0706.h>
 #include <LSD.h>
-#include <LTask.h>
 #include <LWiFi.h>
 #include <LWiFiClient.h>
-
+#include <LTask.h>
 #define WIFI_AP "testEE"
 #define WIFI_PASSWORD "your_password"
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP according to your WiFi AP configuration
@@ -54,7 +53,7 @@ LFile imgFile;
 int i=0;
 void setup()  
 {
-  
+  LTask.begin();
   pinMode(motorIn1, OUTPUT);
   pinMode(motorIn2, OUTPUT);
   pinMode(motorIn3, OUTPUT);
@@ -122,31 +121,34 @@ void snapshot()
    // return;
   } 
   cam.setImageSize(VC0706_640x480);
-  // You can read the size back from the camera (optional, but maybe useful?)
-  uint8_t imgsize = cam.getImageSize();
+  
+   uint8_t imgsize = cam.getImageSize();
+  Serial.print("Image size: ");
+  if (imgsize == VC0706_640x480) Serial.println("640x480");
+  if (imgsize == VC0706_320x240) Serial.println("320x240");
+  if (imgsize == VC0706_160x120) Serial.println("160x120");
 
   Serial.println("Snap in 3 secs...");
   delay(3000);
 
-  if (! cam.takePicture()) 
+  if (!cam.takePicture()) 
     Serial.println("Failed to snap!");
   else 
     Serial.println("Picture taken!");
-  
+  Serial.println("test");
   // Create an image with the name IMAGExx.JPG
-  char filename[13];
-  strcpy(filename, "IMAGE00.jpg");
-  if (! LSD.exists(filename)) LSD.remove(filename);
+
+  if (LSD.exists(file1)) LSD.remove(file1);
   
   // Open the file for writing
-  imgFile = LSD.open(filename, FILE_WRITE);
+  imgFile = LSD.open(file1, FILE_WRITE);
 
   // Get the size of the image (frame) taken  
   uint16_t jpglen = cam.frameLength();
   Serial.print("Storing ");
   Serial.print(jpglen, DEC);
   Serial.print(" byte image.");
-
+  pinMode(8, OUTPUT);
   // Read all the data up to # bytes!
   byte wCount = 0; // For counting # of writes
   while (jpglen > 0) {
@@ -161,9 +163,12 @@ void snapshot()
     }
     //Serial.print("Read ");  Serial.print(bytesToRead, DEC); Serial.println(" bytes");
     jpglen -= bytesToRead;
+    
   }
   imgFile.close();
-  imgFile = LSD.open(filename);
+  Serial.println("test2");
+  delay(10);
+  imgFile = LSD.open(file1);
   Serial.println("Connecting to FTP server");
   
   
@@ -225,7 +230,6 @@ void snapshot()
   c.print(F("STOR "));
   c.println(fileName);
 
-  Serial.println(F("test"));
   if(!eRcv())
   {
     dc.stop();
@@ -372,8 +376,8 @@ void loop()
           case 0x0B:
           
           // alarm on
-                  LAudio.playFile( storageFlash,(char*)"sample.mp3");
-                  LAudio.setVolume(3);
+               //   LAudio.playFile( storageFlash,(char*)"sample.mp3");
+               //   LAudio.setVolume(3);
                   Serial.println("play music");
                   LBTClient.write((uint8_t*)"1", 1);
                   break;
@@ -435,6 +439,14 @@ void loop()
                     delay(1000);
                     LBTClient.write((uint8_t*)"1", 1);
                     break;
+                 case 0x08:
+                //Snapshot
+                    Serial.println("08");
+                    snapshot();
+                    delay(1000);
+                    LBTClient.write((uint8_t*)"1", 1);
+                    break;
+                    
                 default:
                   break;
                    
