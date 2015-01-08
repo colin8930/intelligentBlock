@@ -19,10 +19,13 @@
 #include <LWiFi.h>
 #include <LWiFiClient.h>
 #include <LTask.h>
+
+
 #define WIFI_AP "testEE"
 #define WIFI_PASSWORD "your_password"
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP according to your WiFi AP configuration
-
+#define TRIGPIN  8
+#define ECHOPIN  9
 
 #define TEMP_BUF_SIZE (2048)
 uint8_t buf[TEMP_BUF_SIZE] = {0};
@@ -49,7 +52,7 @@ const int motorIn2 = 5;
 const int motorIn3 = 6;     
 const int motorIn4 = 7;  
 LFile imgFile;
-
+char toSend;
 int i=0;
 void setup()  
 {
@@ -58,6 +61,8 @@ void setup()
   pinMode(motorIn2, OUTPUT);
   pinMode(motorIn3, OUTPUT);
   pinMode(motorIn4, OUTPUT);  
+  pinMode(TRIGPIN, OUTPUT);
+  pinMode(ECHOPIN, INPUT);
   Serial.begin(9600);
   LAudio.begin();
   Serial1.begin(38400);
@@ -226,10 +231,10 @@ void snapshot()
     return;
   }
 
-
+  Serial.print("1");
   c.print(F("STOR "));
   c.println(fileName);
-
+  Serial.print("2");
   if(!eRcv())
   {
     dc.stop();
@@ -264,7 +269,7 @@ if(clientCount > 0) dc.write(clientBuf,clientCount);
 
   if(!eRcv()) return;
 
-  c.println(F("QUIT"));
+  c.println(F("QUIT\r"));
 
   if(!eRcv()) return;
 
@@ -314,7 +319,7 @@ void efail()
 {
   byte thisByte = 0;
   Serial.println("error");
-  c.println(F("QUIT"));
+  c.println(F("QUIT\r"));
 
   while(!c.available()) delay(1);
 
@@ -330,6 +335,40 @@ void efail()
   Serial.println(F("SD closed"));
 }
 
+long ping() {
+digitalWrite(TRIGPIN, LOW);
+delayMicroseconds(2);
+digitalWrite(TRIGPIN, HIGH);
+delayMicroseconds(100);
+digitalWrite(TRIGPIN, LOW);
+return pulseIn(ECHOPIN, HIGH)/58;
+} 
+
+
+boolean ifAhead()
+{
+  long cm = ping();
+  Serial.println(cm);
+  if(cm<5) return 1;
+  else return 0;
+  
+}
+
+boolean ifLeft()
+{
+  long cm = ping();
+  Serial.println(cm);
+  if(cm<5) return 1;
+  else return 0;  
+}
+
+boolean ifRight()
+{
+  long cm = ping();
+  Serial.println(cm);
+  if(cm<5) return 1;
+  else return 0;
+}
 
 void loop()
 {
@@ -398,7 +437,8 @@ void loop()
            
                    Serial.println("ahead ?");
                    delay(1000);
-                   LBTClient.write((uint8_t*)"1", 1);
+                   if(ifAhead())  LBTClient.write((uint8_t*)"1", 1);
+                   else LBTClient.write((uint8_t*)"0", 1);
                    break;
            case 0x42:
            
@@ -406,7 +446,8 @@ void loop()
            
                    Serial.println("left ?");
                    delay(1000);
-                   LBTClient.write((uint8_t*)"0", 1);
+                   if(ifLeft())  LBTClient.write((uint8_t*)"1", 1);
+                   else LBTClient.write((uint8_t*)"0", 1);
                    break;
                    
             case 0x41:
@@ -415,7 +456,8 @@ void loop()
            
                    Serial.println("right ?");
                    delay(1000);
-                   LBTClient.write((uint8_t*)"1", 1);
+                   if(ifRight())  LBTClient.write((uint8_t*)"1", 1);
+                   else LBTClient.write((uint8_t*)"0", 1);
                    break;
              case 0x05:
              
