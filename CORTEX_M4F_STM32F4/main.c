@@ -50,17 +50,18 @@ volatile xSemaphoreHandle serial_tx_wait_sem = NULL;
 volatile xQueueHandle t_queue = NULL;
 volatile xQueueHandle serial_rx_queue = NULL;
 
-
-
+char timeStr[10];
 xTaskHandle xcmdTask;  			//UART
-xTaskHandle xUartTask;			//game
 
-
-
-int last_command=1;
-int SUART_Return=1;  //shell 
-int GUART_Return=0;  //game
 char recv_byte();
+void USART3_puts(char* s)
+{
+    while(*s) {
+        while(USART_GetFlagStatus(USART3, USART_FLAG_TXE) == RESET);
+	USART_SendData(USART3, *s);
+        s++;
+    }
+}
 
 void
 prvInit()
@@ -69,130 +70,40 @@ prvInit()
 
 	//Button
 	STM_EVAL_PBInit( BUTTON_USER, BUTTON_MODE_GPIO );
-
-
 	//UART
 	RCC_Configuration();
   	GPIO_Configuration();
   	USART_Configuration();
- 	USART1_puts("Welcome !\r\n");
-}
 
+  	//button
+  	STM_EVAL_PBInit( BUTTON_USER, BUTTON_MODE_GPIO );
 
-
-char recv_byte()
-{
-	while(USART_GetFlagStatus(USART1, USART_FLAG_RXNE) == RESET);
-        char t = USART_ReceiveData(USART1);
-	return t;
-}
-
-ssize_t stdin_read(void * buf, size_t count) {
-    int i=0, endofline=0, last_chr_is_esc;
-    char *ptrbuf=buf;
-    char ch;
-
-	const portTickType xDelay = 1;
-    while(i < count&&endofline!=1){
-	ptrbuf[i]=recv_byte();
-	switch(ptrbuf[i]){
-		case '\r':
-		case '\n':
-			ptrbuf[i]='\0';
-			endofline=1;
-			break;
-		case '[':
-			if(last_chr_is_esc){
-				last_chr_is_esc=0;
-				ch=recv_byte();
-				if(ch>=1&&ch<=6){
-					ch=recv_byte();
-				}
-				continue;
-			}
-		case ESC:
-			last_chr_is_esc=1;
-			continue;
-		case BACKSPACE:
-			last_chr_is_esc=0;
-			if(i>0){
-				
-				USART_SendData(USART1, '\b');
-				vTaskDelay(xDelay );
-				USART_SendData(USART1, ' ');
-				vTaskDelay(xDelay );
-				USART_SendData(USART1, '\b');
-				--i;
-			}
-			continue;
-		default:
-			last_chr_is_esc=0;
-	}
-	USART_SendData(USART1, ptrbuf[i]);
-	
-	++i;
-    }
-    return i;
-}
-
-void command_prompt(void *pvParameters)
-{
-	
-	char buf[128];
-	char *argv[20];
-        	char hint[] = "block: ";
-
-	USART1_puts("\rWelcome !\r\n");
-	while(1){
-		
-   		USART1_puts(hint);
-		
-		stdin_read(buf, 127);
-	
-		int n=parse_command(buf, argv);
-
-		/* will return pointer to the command function */
-		cmdfunc *fptr=do_command(argv[0]);
-		
-		if(fptr!=NULL){						
-			fptr(n, argv);
-			}	
-		else
-			USART1_puts("\r\ncommand not found.\r\n");
-	}
 
 }
 
 
-/*
-static void EventTask1( void *pvParameters )
-{
-	while( 1 ){
-		 EventHandler1();
-	}
-}
-*/
 
 //Main Function
 int main(void)
 {
+	//RTC_setting();
 	prvInit();
-
+	initialize_RTC();
+	//LCD_Configuration();
 	/* Create the queue used by the serial task.  */
 	vSemaphoreCreateBinary(serial_tx_wait_sem);
 	/* Add for serial input 
 	 * Reference: www.freertos.org/a00116.html */
-	serial_rx_queue = xQueueCreate(1, sizeof(char));
-	
+	serial_rx_queue = xQueueCreate(1, sizeof(char));	
+	/*
+	xTaskCreate(command_prompt,  (signed char *) "command_prompt",   512 , NULL, tskIDLE_PRIORITY + 1, &xcmdTask);			
 
+	vTaskStartScheduler();	*/
 
-	
-		
-		 
-	xTaskCreate(command_prompt,  (signed char *) "command_prompt",   512 , NULL, tskIDLE_PRIORITY + 3, &xcmdTask);		
-		
+	while(!STM_EVAL_PBGetState(BUTTON_USER));
 
-	vTaskStartScheduler();	
+	scanBlock();
+	run();
 		
 	//Call Scheduler
 	//vTaskStartScheduler();
