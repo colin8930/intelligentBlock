@@ -15,19 +15,27 @@
 #include <LBTClient.h>
 #include <LAudio.h>
 #include <Adafruit_VC0706.h>
-#include <LSD.h>
+#include <LFlash.h>
 #include <LWiFi.h>
 #include <LWiFiClient.h>
 #include <LTask.h>
-
+#include <LGSM.h>
 
 #define WIFI_AP "testEE"
 #define WIFI_PASSWORD "your_password"
 #define WIFI_AUTH LWIFI_WPA  // choose from LWIFI_OPEN, LWIFI_WPA, or LWIFI_WEP according to your WiFi AP configuration
-#define TRIGPIN  8
-#define ECHOPIN  9
-
+#define TRIGPINA  6
+#define ECHOPINA  7
+#define TRIGPINB  8
+#define ECHOPINB  9
+#define TRIGPINC  2
+#define ECHOPINC  3
+#define PWMHIGH 200
+#define PWMLOW 0
 #define TEMP_BUF_SIZE (2048)
+#define LEDA 12
+#define LEDB 13
+
 uint8_t buf[TEMP_BUF_SIZE] = {0};
 IPAddress server(140,116,215,68);
 
@@ -40,17 +48,17 @@ LWiFiClient dc;
 char fileName[13] = "IMAGE00.jpg\r";
 char file1[12] = "IMAGE00.jpg";
 Adafruit_VC0706 cam = Adafruit_VC0706(&Serial1);
-
+char phoneNumber[11] = "0933343268"; 
 
 static LBTDeviceInfo info = {0};
 boolean find = 0;
 #define SPP_SVR "master1" // it should be the prefer server's name,  customize it yourself.
 #define ard_log Serial.printf
 int read_size = 0;
-const int motorIn1 = 4;
-const int motorIn2 = 5;
-const int motorIn3 = 6;     
-const int motorIn4 = 7;  
+const int motorIn1 = 10;
+const int motorIn2 = 11;
+const int motorIn3 = 5;     
+const int motorIn4 = 4;  
 LFile imgFile;
 char toSend;
 int i=0;
@@ -61,14 +69,26 @@ void setup()
   pinMode(motorIn2, OUTPUT);
   pinMode(motorIn3, OUTPUT);
   pinMode(motorIn4, OUTPUT);  
-  pinMode(TRIGPIN, OUTPUT);
-  pinMode(ECHOPIN, INPUT);
+  pinMode(TRIGPINA, OUTPUT);
+  pinMode(ECHOPINA, INPUT);
+  pinMode(TRIGPINB, OUTPUT);
+  pinMode(ECHOPINB, INPUT);
+  pinMode(TRIGPINC, OUTPUT);
+  pinMode(ECHOPINC, INPUT);
+  pinMode(LEDA, OUTPUT);
+  pinMode(LEDB, OUTPUT);
+  digitalWrite(motorIn1,LOW);
+  digitalWrite(motorIn2,LOW);
+  digitalWrite(motorIn3,LOW);
+  digitalWrite(motorIn4,LOW);
+  digitalWrite(LEDA,HIGH);
+  digitalWrite(LEDB,HIGH);
   Serial.begin(9600);
   LAudio.begin();
   Serial1.begin(38400);
   LWiFi.begin();
   LAudio.begin();
-  LSD.begin();
+  LFlash.begin();
   
   Serial.println("Connecting to AP");
   while (0 == LWiFi.connect(WIFI_AP,LWiFiLoginInfo(WIFI_AUTH, WIFI_PASSWORD)))
@@ -90,7 +110,7 @@ void setup()
   {
       ard_log("Bluetooth Client begin successfully\n");
       // scan the devices around
-      int num = LBTClient.scan(30);
+      int num = LBTClient.scan(15);
       ard_log("scanned device number [%d]", num);
       for (int i = 0; i < num; i++)
       {
@@ -112,20 +132,46 @@ void setup()
       }
       
   }
+  
+    Serial.println("Connecting to FTP server");
+  
+  
+  while (0 == c.connect(server, 2010))
+  {
+    Serial.println("Re-Connecting to FTP");
+    delay(1000);
+  }
+  if(!eRcv()) {
+    Serial.println("error");
+    return;
+  }
+  c.println("USER embbeded\r");
+  
+  if(!eRcv()) return;
+
+  c.println(F("PASS embbeded\r"));
+
+    if(!eRcv()) return;
+
+  c.println(F("SYST\r"));
+
+  if(!eRcv()) return;
+
+
 }
  
  
 void snapshot()
 {
-  
+  Serial.println("test");
   // Try to locate the camera
   if (cam.begin(38400)) {
     Serial.println("Camera Found:");
   } else {
     Serial.println("No camera found?");
    // return;
-  } 
-  cam.setImageSize(VC0706_640x480);
+  }
+  cam.setImageSize(VC0706_320x240);
   
    uint8_t imgsize = cam.getImageSize();
   Serial.print("Image size: ");
@@ -134,20 +180,22 @@ void snapshot()
   if (imgsize == VC0706_160x120) Serial.println("160x120");
 
   Serial.println("Snap in 3 secs...");
-  delay(3000);
+  delay(1000);
 
   if (!cam.takePicture()) 
     Serial.println("Failed to snap!");
   else 
     Serial.println("Picture taken!");
-  Serial.println("test");
+  
   // Create an image with the name IMAGExx.JPG
 
-  if (LSD.exists(file1)) LSD.remove(file1);
-  
-  // Open the file for writing
-  imgFile = LSD.open(file1, FILE_WRITE);
+  if (LFlash.exists(file1)) LFlash.remove(file1);
+  imgFile = LFlash.open(file1, FILE_WRITE);
 
+
+  // Open the file for writing
+ // imgFile = LSD.open(file1, FILE_WRITE);
+ //imgFile = LSD.open(filename, FILE_WRITE);
   // Get the size of the image (frame) taken  
   uint16_t jpglen = cam.frameLength();
   Serial.print("Storing ");
@@ -173,30 +221,9 @@ void snapshot()
   imgFile.close();
   Serial.println("test2");
   delay(10);
-  imgFile = LSD.open(file1);
-  Serial.println("Connecting to FTP server");
-  
-  
-  while (0 == c.connect(server, 2010))
-  {
-    Serial.println("Re-Connecting to FTP");
-    delay(1000);
-  }
-  if(!eRcv()) return;
+  imgFile = LFlash.open(file1);
 
-  c.println("USER embbeded\r");
-  
-  if(!eRcv()) return;
-
-  c.println(F("PASS embbeded\r"));
-
-    if(!eRcv()) return;
-
-  c.println(F("SYST\r"));
-
-  if(!eRcv()) return;
-
-  c.println(F("PASV\r"));
+c.println(F("PASV\r"));
 
   if(!eRcv()) return;
 
@@ -230,10 +257,12 @@ void snapshot()
     imgFile.close();
     return;
   }
-
+  
   Serial.print("1");
-  c.print(F("STOR "));
-  c.println(fileName);
+  c.println(F("STOR IMAGE00.jpg\r"));
+ // c.print(F(filename));
+ // c.print(F("\r\n"));
+  
   Serial.print("2");
   if(!eRcv())
   {
@@ -244,12 +273,13 @@ void snapshot()
 
 
   Serial.println(F("Writing"));
-
+ 
+  
   byte clientBuf[64];
   int clientCount = 0;
   int imgSize=imgFile.size();
-
-  while(dc.connected()&&imgSize>0)
+    Serial.println(imgSize);
+  while(imgSize>0)
   {
     
       clientBuf[clientCount] = imgFile.read();
@@ -265,20 +295,56 @@ void snapshot()
 if(clientCount > 0) dc.write(clientBuf,clientCount);
 
   dc.stop();
+  if(!eRcv()) return;
   Serial.println(F("Data disconnected"));
 
-  if(!eRcv()) return;
+  //if(!eRcv()) return;
 
-  c.println(F("QUIT\r"));
+ // c.println(F("QUIT\r"));
 
-  if(!eRcv()) return;
+  //if(!eRcv()) return;
 
-  c.stop();
-  Serial.println(F("Command disconnected"));
+ // c.stop();
+  //Serial.println(F("Command disconnected"));
 
   imgFile.close();
   Serial.println(F("SD closed"));
   Serial.println("done!");
+  /*
+  c.println(F("PASV\r"));
+
+  if(!eRcv()) return;
+  
+  char *tStr = strtok(outBuf,"(,");
+  int array_pasv[6];
+  for ( int i = 0; i < 6; i++) {
+    tStr = strtok(NULL,"(,");
+    array_pasv[i] = atoi(tStr);
+    if(tStr == NULL)
+    {
+      Serial.println(F("Bad PASV Answer"));    
+
+    }
+  }
+
+  unsigned int hiPort,loPort;
+
+  hiPort = array_pasv[4] << 8;
+  loPort = array_pasv[5] & 255;
+
+  Serial.print(F("Data port: "));
+  hiPort = hiPort | loPort;
+  Serial.println(hiPort);
+
+  if (dc.connect(server,hiPort)) {
+    Serial.println(F("Data connected"));
+  }
+  else {
+    Serial.println(F("Data connection failed"));
+    c.stop();
+    imgFile.close();
+  }
+*/
 
 }
 
@@ -335,38 +401,65 @@ void efail()
   Serial.println(F("SD closed"));
 }
 
-long ping() {
-digitalWrite(TRIGPIN, LOW);
+long pingA() {
+digitalWrite(TRIGPINA, LOW);
 delayMicroseconds(2);
-digitalWrite(TRIGPIN, HIGH);
+digitalWrite(TRIGPINA, HIGH);
 delayMicroseconds(100);
-digitalWrite(TRIGPIN, LOW);
-return pulseIn(ECHOPIN, HIGH)/58;
+digitalWrite(TRIGPINA, LOW);
+return pulseIn(ECHOPINA, HIGH)/58;
 } 
 
 
+long pingB() {
+digitalWrite(TRIGPINB, LOW);
+delayMicroseconds(2);
+digitalWrite(TRIGPINB, HIGH);
+delayMicroseconds(100);
+digitalWrite(TRIGPINB, LOW);
+return pulseIn(ECHOPINB, HIGH)/58;
+} 
+
+long pingC() {
+digitalWrite(TRIGPINC, LOW);
+delayMicroseconds(2);
+digitalWrite(TRIGPINC, HIGH);
+delayMicroseconds(100);
+digitalWrite(TRIGPINC, LOW);
+return pulseIn(ECHOPINC, HIGH)/58;
+} 
+
 boolean ifAhead()
 {
-  long cm = ping();
+  long cm = pingA();
   Serial.println(cm);
-  if(cm<5) return 1;
+  if(cm<20) return 1;
+  else return 0;
+  
+}
+
+boolean errDet()
+{
+  long cm = pingA();
+  Serial.println(cm);
+  if(cm<15) return 1;
   else return 0;
   
 }
 
 boolean ifLeft()
 {
-  long cm = ping();
+  long cm = pingB();
   Serial.println(cm);
-  if(cm<5) return 1;
+  if(cm<20) return 1;
   else return 0;  
 }
 
 boolean ifRight()
 {
-  long cm = ping();
+  long cm = pingC();
   Serial.println(cm);
-  if(cm<5) return 1;
+  if(cm<20) return 1;
   else return 0;
 }
 
@@ -384,7 +477,7 @@ void loop()
  
         if( !conn_result )
         {
-          //  ard_log("Cannot connect to SPP Server successfully\n");
+          //  ard_log("Cannot connect to SPP Server successfully\n");9
             delay(0xffffffff);
         }
         else
@@ -398,10 +491,37 @@ void loop()
        
        byte cmd = LBTClient.read();
        Serial.println(cmd);
+       int ran=analogRead(A0)%3;
+       Serial.print("ran:");
+       Serial.println(ran);
+      
+       
        switch(cmd){
-         
-         
-          case 0x43:
+            case 0x85:
+                    LBTClient.write((uint8_t*)"1", 1);
+                     for(int j=0; j<8;j++){
+                       while(!LBTClient.available());
+       
+                         byte tmp = LBTClient.read();
+                         Serial.println(tmp);
+                         phoneNumber[j+2]=tmp;
+                         if(j<7)    LBTClient.write((uint8_t*)"1", 1);
+                     
+                     }
+                     Serial.println(phoneNumber);
+                     Serial.println("test");                
+                     SMS();
+                     LBTClient.write((uint8_t*)"1", 1);
+                      break;
+            
+            case 0x00:
+                      LAudio.playFile( storageFlash,(char*)"surprise.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+          case 0x44:
               //ldr
                   if(i<10){
                     LBTClient.write((uint8_t*)"1", 1);
@@ -412,6 +532,8 @@ void loop()
                   else LBTClient.write((uint8_t*)"0", 1);
                   delay(1000);
                   break;
+                  
+          #if 0
           case 0x0B:
           
           // alarm on
@@ -429,14 +551,14 @@ void loop()
                   Serial.println("music stop");
                   LBTClient.write((uint8_t*)"1", 1);
                   break;
-                  
+            #endif    
                   
            case 0x40:
            
            // ahead, get the distance ahead
            
                    Serial.println("ahead ?");
-                   delay(1000);
+                   delay(100);
                    if(ifAhead())  LBTClient.write((uint8_t*)"1", 1);
                    else LBTClient.write((uint8_t*)"0", 1);
                    break;
@@ -445,7 +567,7 @@ void loop()
            // left, get the distance left
            
                    Serial.println("left ?");
-                   delay(1000);
+                   delay(100);
                    if(ifLeft())  LBTClient.write((uint8_t*)"1", 1);
                    else LBTClient.write((uint8_t*)"0", 1);
                    break;
@@ -455,7 +577,7 @@ void loop()
             // right, get the distance right
            
                    Serial.println("right ?");
-                   delay(1000);
+                   delay(100);
                    if(ifRight())  LBTClient.write((uint8_t*)"1", 1);
                    else LBTClient.write((uint8_t*)"0", 1);
                    break;
@@ -463,32 +585,193 @@ void loop()
              
                // move forward
                    Serial.println("05");
+                   //error detection
+                   if(errDet()) {
+                       LAudio.playFile( storageFlash,(char*)"surprise.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                   }
+                   
                    forward();
-                   delay(1000);
+                   delay(300);
+                   motorstop();
                    LBTClient.write((uint8_t*)"1", 1);
                    break;
               case 0x07:
                // turn left
                    Serial.println("07");
                    left();
-                   delay(1000);
+                   delay(300);
+                   motorstop();
                    LBTClient.write((uint8_t*)"1", 1);
                    break;
                case 0x06:
                // turn right
                      Serial.println("06");
                     right();
-                    delay(1000);
+                    delay(300);
+                    motorstop();
                     LBTClient.write((uint8_t*)"1", 1);
                     break;
                  case 0x08:
                 //Snapshot
                     Serial.println("08");
+                    /*LAudio.playFile( storageFlash,(char*)"camera.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();*/
                     snapshot();
                     delay(1000);
                     LBTClient.write((uint8_t*)"1", 1);
                     break;
-                    
+                 case 0x09:
+                     Serial.println("09");
+                     Calling();
+                     delay(1000);
+                     LBTClient.write((uint8_t*)"1", 1);
+                     break;
+                  case 0x0A:
+                      LAudio.playFile( storageFlash,(char*)"cat.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                  case 0x0B:
+                      LAudio.playFile( storageFlash,(char*)"coin.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                  case 0x0C:
+                      LAudio.playFile( storageFlash,(char*)"crow.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                  case 0x0D:
+                      LAudio.playFile( storageFlash,(char*)"kiss.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                  case 0x0E:
+                      LAudio.playFile( storageFlash,(char*)"owl.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                  case 0x10:
+                      LAudio.playFile( storageFlash,(char*)"piano.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                  case 0x11:
+                      LAudio.playFile( storageFlash,(char*)"burp.mp3");
+                      LAudio.setVolume(6);
+                      delay(1000);
+                      LAudio.stop();
+                      LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                       
+                   case 0x12:
+                       SMS();
+                       delay(1000);
+                       LBTClient.write((uint8_t*)"1", 1);
+                       break;
+                    case 0x13:
+                        Calling();
+                        delay(1000);
+                        LBTClient.write((uint8_t*)"1", 1);
+                        break;
+                        
+                    case 0x14:
+                        ledON();
+                        delay(1000);
+                        break;
+                    case 0x15:
+                        ledOFF();
+                        delay(1000);
+                        break;
+                    case 0x16:
+                        ledBlink();
+                        delay(1000);
+                        break;
+                     
+                     
+                    case 0x43:
+                        //random sense
+                        Serial.println("test");
+                        switch(ran){
+                          
+                          case 0:
+                          Serial.println(0);
+                               LAudio.setVolume(6);
+                               LAudio.playFile( storageFlash,(char*)"A.mp3");
+                               LAudio.setVolume(6);
+                               delay(800);
+                               LAudio.stop();                              
+                              if(ifAhead())  {
+                                LAudio.setVolume(6);
+                                LAudio.playFile( storageFlash,(char*)"coin.mp3");
+                               
+                               delay(1000);
+                               LAudio.stop();
+                                LBTClient.write((uint8_t*)"1", 1);
+                              }
+                              else{
+                               // delay(1000);
+                                LBTClient.write((uint8_t*)"0", 1);
+                              }
+                              break;
+                           case 1:
+                               Serial.println(1);
+                               LAudio.setVolume(6);
+                               LAudio.playFile( storageFlash,(char*)"B.mp3");
+                               LAudio.setVolume(6);
+                               delay(800);
+                               LAudio.stop();                             
+                              if(ifLeft())  {
+                                LAudio.playFile( storageFlash,(char*)"coin.mp3");
+                               LAudio.setVolume(6);
+                               delay(1000);
+                               LAudio.stop();
+                                LBTClient.write((uint8_t*)"1", 1);
+                              }
+                              else{
+                              // delay(1000);
+                               LBTClient.write((uint8_t*)"0", 1);
+                              }
+                              break;
+                            case 2:
+                              Serial.println(2);
+                              LAudio.setVolume(6);
+                              LAudio.playFile( storageFlash,(char*)"C.mp3");
+                               LAudio.setVolume(6);
+                               delay(800);
+                               LAudio.stop();      
+                              
+                              if(ifRight()) {
+                                LAudio.playFile( storageFlash,(char*)"coin.mp3");
+                               LAudio.setVolume(6);
+                               delay(1000);
+                               LAudio.stop();
+                                LBTClient.write((uint8_t*)"1", 1);
+                              }
+                              else{
+                                // delay(1000);
+                                LBTClient.write((uint8_t*)"0", 1);
+                              }break;
+                        }
                 default:
                   break;
                    
@@ -499,6 +782,34 @@ void loop()
     }
 
 }
+
+void ledON(){
+  Serial.println("on");
+  digitalWrite(LEDA, HIGH);
+  digitalWrite(LEDB, HIGH);
+}
+
+void ledOFF(){
+  Serial.println("off");
+  digitalWrite(LEDA, LOW);
+  digitalWrite(LEDB, LOW);
+}
+
+void ledBlink(){
+  digitalWrite(LEDA, LOW);
+  digitalWrite(LEDB, HIGH);
+  delay(1000);
+  digitalWrite(LEDB, LOW);
+  digitalWrite(LEDA, HIGH);
+  delay(1000);
+  digitalWrite(LEDA, LOW);
+  digitalWrite(LEDB, HIGH);
+  delay(1000);
+  digitalWrite(LEDA, LOW);
+  digitalWrite(LEDB, LOW);
+}
+
+
 
 
 void motorstop()
@@ -528,17 +839,55 @@ void backward()
 	// Let right motor keep running, but stop left motor
 void right()
 {
-  digitalWrite(motorIn1, HIGH);
-  digitalWrite(motorIn2, LOW);
-  digitalWrite(motorIn3, LOW);
+  digitalWrite(motorIn1, LOW);
+  digitalWrite(motorIn2, HIGH);
+  digitalWrite(motorIn3, HIGH);
   digitalWrite(motorIn4, LOW);
 }
 	
 // Let left motor keep running, but stop right motor
 void left()
-{
-  digitalWrite(motorIn1, LOW);
+{  
+  digitalWrite(motorIn1, HIGH);
   digitalWrite(motorIn2, LOW);
-  digitalWrite(motorIn3, HIGH);
-  digitalWrite(motorIn4, LOW);
+  digitalWrite(motorIn3, LOW);
+  digitalWrite(motorIn4, HIGH);
+  
+}
+
+void Calling()
+{ 
+        Serial.print("Calling \n");   
+        
+        // Check if the receiving end has picked up the call
+        if(LVoiceCall.voiceCall(phoneNumber))
+        {
+          Serial.println("Call Established. Enter line to end");
+          // Wait for some input from the line
+          while(Serial.read() !='\n');
+          // And hang up
+          LVoiceCall.hangCall();
+        }
+        Serial.println("Call Finished");
+}
+
+void SMS()
+{
+      while(!LSMS.ready()){
+        Serial.println("not ready");
+       delay(1000);
+      }
+      Serial.println("SIM ready for work");
+     LSMS.beginSMS(phoneNumber);
+     LSMS.println("welcome to user final presentation");
+     LSMS.print("password is: 123");
+     
+     if(LSMS.endSMS())
+     {
+         Serial.println("SMS is sent");
+     }
+     else
+     {
+          Serial.println("SMS is not sent");
+     }
 }
