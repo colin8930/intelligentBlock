@@ -253,45 +253,6 @@ int det_condition(uint8_t con, uint8_t* nextR){
 	}
 
 }
-void scanBlock(){
-
-	/* init the GPIO */
-	
-
-	/* read shift register first*/
-	blockTotal=0;
-	USART1_puts("\n\rscanning start\n\r");
-	M74HC165_Init();
-	readSRs();
-#if 0
-       	while(USART_GetFlagStatus(USART6, USART_FLAG_TXE) == RESET);
-	
-	USART_SendData(USART6, 0x31);
-	
-	
-	while(USART_GetFlagStatus(USART6, USART_FLAG_RXNE) == RESET);
-	
-        	uint8_t a = USART_ReceiveData(USART6);
-
-
-        	int i = blockTotal;
-       	/*scan until t == 0x00 */
-        	while(1){
-        		
-        		//USART_SendData(USART1, '3');
-        		while(USART_GetFlagStatus(USART6, USART_FLAG_RXNE) == RESET);
-        		block[i] = USART_ReceiveData(USART6);
-        		USART_SendData(USART1, block[i]+48);
-        		if(block[i]==0x00) break; // last ' } ' receive
-
-        		i++;
-
-        	}
-
-        	blockTotal=i;
-#endif
-}
-
 char * _byteToStr(uint8_t oneByte)	// Hexadecimal to Decimal'string 
 {
 	
@@ -310,6 +271,59 @@ char * _byteToStr(uint8_t oneByte)	// Hexadecimal to Decimal'string
 	*(Str+5)='\n';
 	return Str;
 }
+void scanBlock(){
+
+	/* init the GPIO */
+	
+
+	/* read shift register first*/
+	blockTotal=0;
+	USART1_puts("\n\rscanning start\n\r");
+	
+	int flag=0;
+	int Timeout=1000000;
+       	while(USART_GetFlagStatus(USART6, USART_FLAG_TXE) == RESET);
+
+	USART_SendData(USART6, 0x31);
+
+	while(Timeout>0){
+
+		if(!(USART_GetFlagStatus(USART6, USART_FLAG_RXNE) == RESET)){
+			uint8_t a = USART_ReceiveData(USART6);
+       			flag=1;
+       			//USART1_puts("test1");
+       			break;
+       		}
+       		Timeout--;
+	}
+
+	M74HC165_Init();
+	readSRs();
+		//USART1_puts("test2");
+	if(flag==1){
+		//USART1_puts("test3");
+        		
+
+
+        		int i = blockTotal-1;
+       		/*scan until t == 0x00 */
+        		while(1){
+        		
+        			//USART_SendData(USART1, '3');
+        			while(USART_GetFlagStatus(USART6, USART_FLAG_RXNE) == RESET);
+        			block[i] = USART_ReceiveData(USART6);
+        			USART1_puts(_byteToStr(block[i]));
+        			if(block[i]==0x00||block[i]==0xFF) break; // last ' } ' receive
+
+        			i++;
+
+        		}
+
+        	blockTotal=i;
+        }
+}
+
+
 
 void run(){
 
@@ -328,6 +342,29 @@ int runCode(int run){
 			int next = run;
 			USART1_put(next+0x30);
 			switch(block[run]){
+				case SMS:;
+					//USART1_puts("test");
+					//int ack=sendCmd(block[run]);
+					int ack=sendCmd(0x85);
+					for(int i=0;i<8;i++){
+
+						uint8_t num=block[run+i+1]>>4;
+						if(num>9) {
+							USART1_puts("error");
+							sendCmd(ERRORMESSAGE);
+							return 0;
+						}
+						else {
+							//USART1_puts("test");
+							//USART_SendData(USART1, num);
+							//sendCmd(num+'0');
+							sendCmd(num+0x30);						
+							
+						}
+
+					}
+					return run+9;
+
 
 				case REPEAT: ;
 					uint8_t repeatTime = block[run+1];
@@ -344,9 +381,9 @@ int runCode(int run){
 					{
 					uint8_t whileCond = block[run+1];
 					int torun=next;
-					if(whileCond<0x40||whileCond>0x43)
+					if(whileCond<0x40||whileCond>0x44)
 					{
-						sendCmd(ERROR);
+						sendCmd(ERRORMESSAGE);
 						return 0;
 					}
 
@@ -365,9 +402,9 @@ int runCode(int run){
 					{
 					uint8_t waitCond = block[run+1];
 					int torun=next;
-					if(waitCond<0x40||waitCond>0x43)
+					if(waitCond<0x40||waitCond>0x44)
 					{
-						sendCmd(ERROR);
+						sendCmd(ERRORMESSAGE);
 						return 0;
 					}
 					while(!det_condition(waitCond, &next)){
@@ -382,7 +419,7 @@ int runCode(int run){
 					uint8_t ifCond = block[run+1];
 					if(ifCond<0x40||ifCond>0x43)
 					{
-						sendCmd(ERROR);
+						sendCmd(ERRORMESSAGE);
 						return 0;
 					}
 					if(det_condition(ifCond, &next)){
@@ -433,9 +470,9 @@ int runCode(int run){
 			return run+1;
 		} 
 		else if(block[run]!=0x00&&block[run]!=0x01){
-			if(block[run]>=0x40||block[run]<=0x43)
+			if(block[run]>=0x40&&block[run]<=0x44)
 			{
-				sendCmd(ERROR);
+				sendCmd(ERRORMESSAGE);
 				return 0;
 			}
 			int ack=sendCmd(block[run]);
@@ -701,20 +738,25 @@ void readSRs(){
 	/* read a byte*/
 	uint8_t incomming=readSR();
 	USART1_puts(_byteToStr(incomming));
-	while(incomming!=0){
+	while(incomming!=0&&incomming!=0xFF){
 
 		block[blockTotal]=incomming;
 		blockTotal++;
 		incomming = readSR();
 		USART1_puts(_byteToStr(incomming));
-
+		block[blockTotal]=incomming;
 	}
 	
 	GPIO_SetBits(M74HC165_PORT, M74HC165_ENABLE);
 
 }
 
+void start(){
 
+	blockTotal=0;
+	scanBlock();
+       	run();
+}
 
 /**********************************74HC165*******************************/
 void M74HC165_Init(void)
@@ -751,13 +793,13 @@ void RCC_Configuration(void)
        RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
 
 /* USART1 clock enable */
-      //RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART6, ENABLE);
+      RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART6, ENABLE);
 
        
       RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
       RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
 
-     //RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
       /* GPIOA clock enable */
 
 }
@@ -784,8 +826,8 @@ void GPIO_Configuration(void)
 
 
 	/*-------------------------- GPIO Configuration(UART 6) ----------------------------*/
-	//GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
-	//GPIO_Init(GPIOC, &GPIO_InitStructure);
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
 	/* Connect USART pins to AF */
 	GPIO_PinAFConfig(GPIOA, GPIO_PinSource9, GPIO_AF_USART1);   // USART1_TX
@@ -794,8 +836,8 @@ void GPIO_Configuration(void)
 	GPIO_PinAFConfig(GPIOD, GPIO_PinSource8, GPIO_AF_USART1);   // USART3_TX
 	GPIO_PinAFConfig(GPIOD, GPIO_PinSource9, GPIO_AF_USART1);  // USART3_RX
 
-	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_USART6);   // USART2_TX
-	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_USART6);  // USART2_RX
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_USART6);   // USART2_TX
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_USART6);  // USART2_RX
 }
  
 /**************************************************************************************/
@@ -820,8 +862,8 @@ void USART_Configuration(void)
 	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
 	USART_InitStructure.USART_Mode = USART_Mode_Rx | USART_Mode_Tx;
 
-	//USART_Init(USART6, &USART_InitStructure); //USART2 init
-	//USART_Cmd(USART6, ENABLE);
+	USART_Init(USART6, &USART_InitStructure); //USART2 init
+	USART_Cmd(USART6, ENABLE);
 
 	USART_Init(USART1, &USART_InitStructure);  //USART1 init
 	USART_Cmd(USART1, ENABLE);
