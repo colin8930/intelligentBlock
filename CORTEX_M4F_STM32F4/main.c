@@ -27,7 +27,6 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "shell.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include <math.h>
@@ -99,11 +98,12 @@ int main(void)
 	xTaskCreate(command_prompt,  (signed char *) "command_prompt",   512 , NULL, tskIDLE_PRIORITY + 1, &xcmdTask);			
 
 	vTaskStartScheduler();	*/
-
-	while(!STM_EVAL_PBGetState(BUTTON_USER));
-
-	scanBlock();
-	run();
+      while(1){
+        
+        while(!STM_EVAL_PBGetState(BUTTON_USER));
+        scanBlock();
+        run();
+      }
 		
 	//Call Scheduler
 	//vTaskStartScheduler();

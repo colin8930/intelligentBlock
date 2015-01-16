@@ -1,6 +1,5 @@
 #include "main.h"
 #include "stm32f4xx.h"
-#include "shell.h"
 #include "stm32f429i_discovery.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -17,37 +16,18 @@
 #define M74HC165_CLOCK		GPIO_Pin_2
 #define M74HC165_DATA		GPIO_Pin_3
 
-
-//uint8_t block[BLOCKMAX];
-//uint8_t block[BLOCKMAX]={REPEAT, 10, IF, LESS, X, 5, PRINT, HELLOWORLD, BRACKET, BRACKET, ELSE , PRINT, TEST,BRACKET, BRACKET, ADD, X, 1, BRACKET,  END};
-uint8_t block[BLOCKMAX]={ ALARMON, PRINT,HELLOWORLD,BRACKET, REPEAT, 10, 
-	IF, IFAHEAD, MOVEFORWARD, BRACKET, IF, IFLEFT, TURNLEFT,BRACKET, IF,IFRIGHT, TURNRIGHT,BRACKET, BRACKET,ALARMOFF, END};
-//uint8_t block[BLOCKMAX]={WAIT, 0x00, 0x10, PRINT, HELLOWORLD, END};
-int state = 0;  //not used now
-
-/*
-	0: blockly
-
-*/
-
-
-/*test*/
-/*
-	print("test");
-	repeat(10){
-		print(Hello World!);
-	}
-
-
-*/
+uint8_t block[BLOCKMAX];
 
 char Str[10];
-int blockTotal=14;
+
+int blockTotal=0;
 int a=0;
 int b=0;
 int c=0;
 int ifCount=0;
 int elseCount=0;
+
+
 static char* itoa(int value, char* result, int base)
 {
 	if (base < 2 || base > 36) {
@@ -182,35 +162,41 @@ int cal(uint8_t con, uint8_t* nextR){
 
 int det_condition(uint8_t con, uint8_t* nextR){
 	int x, y=0;
+	//USART1_put(con);
 	switch(con){
 
+		case LDRPUSH: ;
+			USART1_put(con);
+			if(getSensor(con)) {
+				*nextR=*nextR+2;
+				return 1;
+			}
+			else return 0;		
+			break;
 		case IFAHEAD: ;
-
-			if(getSensor('B')) {
+			USART1_put(con);
+			if(getSensor(con)) {
 				*nextR=*nextR+2;
 				return 1;
 			}
 			else return 0;		
 			break;
-
 		case IFLEFT: ;
-
-			if(getSensor('C')) {
-				*nextR=*nextR+2;
-				return 1;
-			}
-			else return 0;
-			break;
-			
-		case IFRIGHT: ;
-
-			if(getSensor('D')) {
+			USART1_put(con);
+			if(getSensor(con)) {
 				*nextR=*nextR+2;
 				return 1;
 			}
 			else return 0;		
 			break;
-		
+		case IFRIGHT: ;
+			USART1_put(con);
+			if(getSensor(con)) {
+				*nextR=*nextR+2;
+				return 1;
+			}
+			else return 0;		
+			break;
 
 		case GREATER: ;
 			
@@ -277,8 +263,7 @@ void scanBlock(){
 	USART1_puts("\n\rscanning start\n\r");
 	M74HC165_Init();
 	readSRs();
-	USART1_put(block[0]+48);
-	#if 0
+#if 0
        	while(USART_GetFlagStatus(USART6, USART_FLAG_TXE) == RESET);
 	
 	USART_SendData(USART6, 0x31);
@@ -286,7 +271,7 @@ void scanBlock(){
 	
 	while(USART_GetFlagStatus(USART6, USART_FLAG_RXNE) == RESET);
 	
-        		uint8_t a = USART_ReceiveData(USART6);
+        	uint8_t a = USART_ReceiveData(USART6);
 
 
         	int i = blockTotal;
@@ -302,10 +287,9 @@ void scanBlock(){
         		i++;
 
         	}
-        	#endif
-        	USART1_puts("scan finished\n\r");
-        	//blockTotal=i;
 
+        	blockTotal=i;
+#endif
 }
 
 char * _byteToStr(uint8_t oneByte)	// Hexadecimal to Decimal'string 
@@ -316,184 +300,15 @@ char * _byteToStr(uint8_t oneByte)	// Hexadecimal to Decimal'string
 
 	uint8_t fw = (oneByte>>4);
 	if(fw<10) *(Str+2) = fw+'0';
-	else {
-		switch(fw){
-			case 0xA: ;
-				*(Str+2)='A';
-				break;
-			case 0xB: ;
-				*(Str+2)='B';
-				break;
-			case 0xC: ;
-				*(Str+2)='C';
-				break;
-			case 0xD: ;
-				*(Str+2)='D';
-				break;
-			case 0xE: ;
-				*(Str+2)='E';
-				break;
-			case 0xF: ;
-				*(Str+2)='F';
-				break;
-			default:
-				break;
-
-		}
-	}
+	else	*(Str+2)=(fw-0xA)+'A';
+	
 	uint8_t sw = oneByte&0x0F;
 
 	if(sw<10) *(Str+3) = sw+'0';
-	else {
-		switch(sw){
-			case 0xA: ;
-				*(Str+3)='A';
-				break;
-			case 0xB: ;
-				*(Str+3)='B';
-				break;
-			case 0xC: ;
-				*(Str+3)='C';
-				break;
-			case 0xD: ;
-				*(Str+3)='D';
-				break;
-			case 0xE: ;
-				*(Str+3)='E';
-				break;
-			case 0xF: ;
-				*(Str+3)='F';
-				break;
-			default:
-				break;
-
-		}
-	}
+	else	*(Str+3)=(sw-0xA)+'A';
 	*(Str+4)='\r';
 	*(Str+5)='\n';
 	return Str;
-}
-
-
-void showCode(){
-
-	int tabNum=0;
-
-	USART1_puts("\r\n\r\n");
-	#if 0
-	for(int i=0; i<=blockTotal; i++){
-
-		
-
-		//control
-		if((block[i]&OPCODE)==OPCODE){  
-
-			if(tabNum > 0) putTab(tabNum);
-			
-			
-			switch (block[i]) {
-
-				case REPEAT:  //while
-					tabNum++;
-					USART1_puts("repeat(");
-					i++;
-					char* string=" ";
-					string=itoa(block[i], string ,10);
-					USART1_puts("10");
-					//while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
-					//USART_SendData(USART1, block[i]+48);
-					USART1_puts("){ \r\n");
-					
-					break;
-
-				case IF: //if
-					tabNum++;
-					USART1_puts("if(");
-					i++;
-					USART1_puts("X");
-					i++;
-					USART1_puts("<");
-					i++;
-					USART1_puts("5");
-					
-					
-					USART1_puts("){ \r\n");
-					
-					break;
-
-				case ELSE: //else
-					tabNum++;
-					USART1_puts("else{\r\n");
-					break;
-				case PRINT: ;
-					USART1_puts("print(\"");
-						i++;
-					if(block[i]==HELLOWORLD){
-
-						USART1_puts("Hello world!");
-						i++;
-					}
-					else if(block[i]==TEST){
-
-						USART1_puts("TEST");
-						i++;
-					}
-					else{
-						while(block[i]!=0x01){
-							USART1_put(block[i]);
-							i++;
-						}
-
-					}					
-					
-					USART1_puts("\");\r\n");
-
-
-					break;
-				case ADD: ;
-
-					USART1_puts("add(");
-					i++;
-					USART1_puts("X, ");
-					i++;
-					USART1_put(block[i]+0x30);
-					i++;
-					USART1_puts(");\r\n");
-					break;
-
-
-				default :
-
-					USART1_puts("block config error!\r\n");
-					break;
-
-			}
-		}
-		else if(block[i]==0x01||block[i]==0x00){
-			
-			tabNum--;
-			if(tabNum > 0) putTab(tabNum);
-			USART1_puts("}\r\n");
-			
-
-		}
-		else{
-			if(tabNum > 0) putTab(tabNum);
-			while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
-			USART_SendData(USART1, block[i]+48);
-			USART1_puts(";\r\n");
-		}
-
-		
-
-
-	}
-
-	#endif
-	int i = 0;
-	
-	while(block[i]!=0) USART1_puts(_byteToStr(block[i++]));
-
 }
 
 void run(){
@@ -511,6 +326,7 @@ int runCode(int run){
 
 		if((block[run]&OPCODE)==OPCODE){   //special block
 			int next = run;
+			USART1_put(next+0x30);
 			switch(block[run]){
 
 				case REPEAT: ;
@@ -525,35 +341,61 @@ int runCode(int run){
 					break;
 
 				case REPEATUNTIL: ;    //while
-
+					{
 					uint8_t whileCond = block[run+1];
 					int torun=next;
-					
-					while(det_condition(whileCond, &next)){
+					if(whileCond<0x40||whileCond>0x43)
+					{
+						sendCmd(ERROR);
+						return 0;
+					}
 
-						// if it return TRUE, run code until  the bracket of while, while() {    " } " .
+					while(!det_condition(whileCond, &next)){
+
+						// if it return false, run code until  the bracket of while, while() {    " } " .
 						ifCount++;
 						runCode(next);
 						next=torun;
 					}
 					elseCount++;
+				}
 					return runCode(norunCode(next+1) );
+					break;
+				case WAITUNTIL: ;
+					{
+					uint8_t waitCond = block[run+1];
+					int torun=next;
+					if(waitCond<0x40||waitCond>0x43)
+					{
+						sendCmd(ERROR);
+						return 0;
+					}
+					while(!det_condition(waitCond, &next)){
+						next=torun;
+						//runCode(next);
+						
+					}
+					}
+					return runCode(next);
 					break;
 				case IF: ;
 					uint8_t ifCond = block[run+1];
-					
+					if(ifCond<0x40||ifCond>0x43)
+					{
+						sendCmd(ERROR);
+						return 0;
+					}
 					if(det_condition(ifCond, &next)){
 
-						ifCount++;
+						ifCount=1;
 						next=runCode(next);
-						if(block[next]==ELSE){
 
+						if(block[next]==ELSE){
 							return runCode(norunCode(next+1) );					
 						}
 						return runCode(next);
 					} 
 					else{
-						
 						
 						next=norunCode(run+1);
 						if(block[next]==ELSE){
@@ -564,53 +406,13 @@ int runCode(int run){
 					}
 
 					break;
-
-
-				/*
-				case ELSE: ;
-
-
-				break;
-
-				*/
-				case PRINT: ;
-					int running = run+1;
-					if(block[running]==HELLOWORLD){
-
-						USART1_puts("Hello world!\r\n");
-						running++;
-					}
-					else if(block[running]==TEST){
-
-						USART1_puts("TEST\r\n");
-						running++;
-					}
-
-					else{
-						while(block[running]!=BRACKET){
-						USART1_put(block[running]);
-						running++;
-						}
-					}
-					
-
-					return runCode(running+1);  //next of 0x01
-					break;
-				case ADD: ;
-					next=cal(ADD, &next);
-					return runCode(next);
-					break;
-				case MINUS: ;
-					next=cal(MINUS, &next);
-					return runCode(next);
-					break;
-
 				case WAIT: ;
 					uint8_t min = block[run+1];
 					uint8_t sec = block[run+2];
 					reset_alarm();
 					set_alarm_time(min, sec, 'a');
 					while(RTC_GetFlagStatus(RTC_FLAG_ALRAF)==RESET); // wait until time out
+					USART1_puts("time out");
 					return runCode(next+3);
 
 
@@ -631,6 +433,11 @@ int runCode(int run){
 			return run+1;
 		} 
 		else if(block[run]!=0x00&&block[run]!=0x01){
+			if(block[run]>=0x40||block[run]<=0x43)
+			{
+				sendCmd(ERROR);
+				return 0;
+			}
 			int ack=sendCmd(block[run]);
 			if(!ack) USART1_puts("error occurs when the device doing the command\r\n");
 			else USART1_puts("send OK\r\n");
@@ -691,11 +498,161 @@ int norunCode(int run){  //for if else
 	} 
 	return running;
 }
+char* cmdtoStr(uint8_t cmd){
 
+	switch(cmd){
+
+		case LDRPUSH: ;
+			return "LDRPUSH";	
+			break;
+		case IFAHEAD: ;
+			return "IFAHEAD";	
+			break;
+		case IFLEFT: ;
+			return "IFLEFT";	
+			break;
+		case IFRIGHT: ;
+			return "IFRIGHT";	
+			break;
+		case MOVEFORWARD : ;
+			return "IFRIGHT";	
+			break;	
+		case TURNRIGHT: ;
+			return "TURNRIGHT";	
+			break;	
+		case TURNLEFT: ;
+			return "TURNLEFT";	
+			break;	
+		case ALARMON: ;
+			return "ALARMON";	
+			break;	
+		case ALARMOFF: ;
+			return "ALARMOFF";	
+			break;	
+
+		default:
+
+			break;
+
+
+
+	}
+
+
+}
 void sendcode(){
 
-	for(int i=0; i<blockTotal; i++ ){
-		USART3_put(block[i]);
+	int tabNum=0;
+	USART1_puts("\r\n");
+	for(int i=0; i<=blockTotal; i++){		
+
+		//control
+		if((block[i]&OPCODE)==OPCODE){  
+
+			if(tabNum > 0) putTab(tabNum);
+			
+			
+			switch (block[i]) {
+
+				case WAIT:  //while
+					USART1_puts("wait(");
+					i++;
+					char* waittime;
+					waittime=itoa(block[i], waittime ,10);
+					USART1_puts(waittime);
+					i++;
+					waittime=itoa(block[i], waittime ,10);;
+					USART1_puts(waittime);
+					//while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+					//USART_SendData(USART1, block[i]+48);
+					USART1_puts("); \r\n");
+					
+					break;
+
+				case REPEAT:  //while
+					tabNum++;
+					USART1_puts("repeat(");
+					i++;
+					char* string=" ";
+					string=itoa(block[i], string ,10);
+					USART1_puts(string);
+					//while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) == RESET);
+					//USART_SendData(USART1, block[i]+48);
+					USART1_puts("){ \r\n");
+					
+					break;
+
+				case REPEATUNTIL:  //while
+					tabNum++;
+					USART1_puts("repeat until(");
+					i++;
+					USART1_puts(cmdtoStr(block[i]));
+					USART1_puts("){ \r\n");
+					
+					break;
+
+				case IF: //if
+					tabNum++;
+					USART1_puts("if(");
+					i++;
+					USART1_puts(cmdtoStr(block[i]));		
+					
+					USART1_puts("){ \r\n");
+					
+					break;
+
+				case ELSE: //else
+					tabNum++;
+					USART1_puts("else{\r\n");
+					break;
+				case PRINT: ;
+					USART1_puts("print(\"");
+						i++;
+					if(block[i]==HELLOWORLD){
+
+						USART1_puts("Hello world!");
+						i++;
+					}
+					else if(block[i]==TEST){
+
+						USART1_puts("TEST");
+						i++;
+					}
+					else{
+						while(block[i]!=0x01){
+							USART1_put(block[i]);
+							i++;
+						}
+
+					}		
+					
+					USART1_puts("\");\r\n");
+
+					break;
+
+
+				default :
+
+					USART1_puts("block config error!\r\n");
+					break;
+
+			}
+		}
+		else if(block[i]==0x01||block[i]==0x00){
+			
+			tabNum--;
+			if(tabNum > 0) putTab(tabNum);
+			USART1_puts("}\r\n");
+			
+
+		}
+		else{
+			if(tabNum > 0) putTab(tabNum);
+			USART1_puts(cmdtoStr(block[i]));
+			USART1_puts(";\r\n");
+		}	
+
+
 	}
 
 }
@@ -719,8 +676,7 @@ uint8_t readSR(){
 		
 		//result|=(<<i);
 		if(M74HC165_PORT->IDR&M74HC165_DATA) result|= (1<<i);
-		
-		GPIO_ResetBits(M74HC165_PORT, M74HC165_CLOCK);		
+		GPIO_ResetBits(M74HC165_PORT, M74HC165_CLOCK);
 		GPIO_SetBits(M74HC165_PORT, M74HC165_CLOCK);
 		
 
@@ -744,12 +700,13 @@ void readSRs(){
 	
 	/* read a byte*/
 	uint8_t incomming=readSR();
-	USART1_put(incomming+48);
+	USART1_puts(_byteToStr(incomming));
 	while(incomming!=0){
 
 		block[blockTotal]=incomming;
 		blockTotal++;
 		incomming = readSR();
+		USART1_puts(_byteToStr(incomming));
 
 	}
 	
